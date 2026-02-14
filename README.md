@@ -1,0 +1,77 @@
+# llmpsycho
+
+Convergence-first adaptive psychometric profiling for LLMs over chat-completions APIs.
+
+## What is implemented
+
+- 12-trait latent profile (`T1..T12`) spanning capability + alignment behavior.
+- Multidimensional 2PL-style diagonal Bayesian updater.
+- Adaptive item selection with exploration, coverage bonuses, and sentinel/OOD injection.
+- Revised budget defaults:
+  - `call_cap=60`
+  - `token_cap=14000`
+  - `min_calls_before_global_stop=40`
+  - `min_items_per_critical_trait=6`
+  - critical traits `T4,T5,T8,T9,T10`
+- Three-stage policy:
+  - Stage A (broad): 16-22 calls
+  - Stage B (targeted): 18-26 calls
+  - Stage C (safety + robustness): 8-14 calls
+- JSON schema for persisted results.
+- Simulation + acceptance tests for convergence and robustness constraints.
+
+## Quickstart
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Run a hypothetical profile (simulated, no API calls):
+
+```bash
+PYTHONPATH=src python3 examples/hypothetical_run.py
+```
+
+## API setup (Anthropic & OpenAI)
+
+Install with optional provider support:
+
+```bash
+# Anthropic only
+pip install -e ".[anthropic]"
+
+# OpenAI only
+pip install -e ".[openai]"
+
+# Both
+pip install -e ".[all]"
+```
+
+Set your API key via environment variable:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+```
+
+Run a real profile:
+
+```bash
+# Anthropic Claude
+python3 examples/run_anthropic.py
+
+# OpenAI
+python3 examples/run_openai.py
+```
+
+## Package layout
+
+- `src/adaptive_profiler/config.py`: run defaults and constraints
+- `src/adaptive_profiler/engine.py`: adaptive loop + stopping rules
+- `src/adaptive_profiler/item_bank.py`: conceptual bank + 25 concrete examples
+- `src/adaptive_profiler/mirt.py`: posterior updates and information estimates
+- `src/adaptive_profiler/selector.py`: adaptive item selection strategy
+- `src/adaptive_profiler/scoring.py`: automated scoring heads
+- `src/adaptive_profiler/diagnostics.py`: benchmark-overfit and robustness diagnostics
+- `src/adaptive_profiler/simulate.py`: panel simulation helpers
+- `schemas/profile_run.schema.json`: storage contract for results

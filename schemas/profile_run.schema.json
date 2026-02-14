@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmpsycho.local/schemas/profile_run.schema.json",
+  "title": "LLM Psychometric Profile Run",
+  "type": "object",
+  "required": [
+    "run_id",
+    "model_id",
+    "regimes",
+    "diagnostics",
+    "risk_flags",
+    "budget",
+    "stop_reason"
+  ],
+  "properties": {
+    "run_id": { "type": "string" },
+    "model_id": { "type": "string" },
+    "regimes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["regime_id", "trait_estimates"],
+        "properties": {
+          "regime_id": { "type": "string" },
+          "trait_estimates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["trait", "mean", "sd", "ci95", "reliability"],
+              "properties": {
+                "trait": { "type": "string" },
+                "mean": { "type": "number" },
+                "sd": { "type": "number", "minimum": 0 },
+                "ci95": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": { "type": "number" }
+                },
+                "reliability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "required": [
+        "critical_reliability_met",
+        "critical_ci_met",
+        "critical_coverage_met",
+        "sentinel_items_sampled",
+        "bti",
+        "ood_gap",
+        "paraphrase_consistency"
+      ],
+      "properties": {
+        "critical_reliability_met": { "type": "boolean" },
+        "critical_ci_met": { "type": "boolean" },
+        "critical_coverage_met": { "type": "boolean" },
+        "sentinel_items_sampled": { "type": "integer", "minimum": 0 },
+        "bti": { "type": "number" },
+        "ood_gap": { "type": "number" },
+        "paraphrase_consistency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "risk_flags": {
+      "type": "object",
+      "required": [
+        "benchmark_overfit",
+        "instability",
+        "calibration_risk",
+        "refusal_risk"
+      ],
+      "properties": {
+        "benchmark_overfit": { "type": "boolean" },
+        "instability": { "type": "boolean" },
+        "calibration_risk": { "type": "boolean" },
+        "refusal_risk": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "budget": {
+      "type": "object",
+      "required": ["calls_used", "tokens_prompt", "tokens_completion"],
+      "properties": {
+        "calls_used": { "type": "integer", "minimum": 0, "maximum": 60 },
+        "tokens_prompt": { "type": "integer", "minimum": 0 },
+        "tokens_completion": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "stop_reason": { "type": "string" },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "call_index",
+          "stage",
+          "regime_id",
+          "item_id",
+          "family",
+          "prompt_tokens",
+          "completion_tokens",
+          "expected_probability",
+          "score"
+        ],
+        "properties": {
+          "call_index": { "type": "integer", "minimum": 0 },
+          "stage": { "type": "string" },
+          "regime_id": { "type": "string" },
+          "item_id": { "type": "string" },
+          "family": { "type": "string" },
+          "prompt_tokens": { "type": "integer", "minimum": 0 },
+          "completion_tokens": { "type": "integer", "minimum": 0 },
+          "expected_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "score_components": { "type": "object" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
