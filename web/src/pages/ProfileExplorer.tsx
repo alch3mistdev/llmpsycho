@@ -116,8 +116,12 @@ export function ProfileExplorer() {
   const probeRows = probeTraceQuery.data?.items ?? [];
   useEffect(() => {
     if (probeRows.length === 0) {
-      setSelectedProbeCallIndex(null);
-      setPlaybackCallIndex(null);
+      if (selectedProbeCallIndex !== null) {
+        setSelectedProbeCallIndex(null);
+      }
+      if (playbackCallIndex !== null) {
+        setPlaybackCallIndex(null);
+      }
       return;
     }
     if (selectedProbeCallIndex === null || !probeRows.some((row) => row.call_index === selectedProbeCallIndex)) {

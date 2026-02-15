@@ -5,6 +5,14 @@ import { ProfileExplorer } from "./ProfileExplorer";
 import { renderWithProviders } from "../test/test-utils";
 import { useStudioStore } from "../store/useStudioStore";
 
+vi.mock("../components/charts/TraitRadarChart", () => ({
+  TraitRadarChart: () => <div data-testid="trait-radar-chart" />
+}));
+
+vi.mock("../components/charts/ProbeDynamicsRailChart", () => ({
+  ProbeDynamicsRailChart: () => <div data-testid="probe-dynamics-rail-chart" />
+}));
+
 vi.mock("../lib/api", () => ({
   listProfiles: vi.fn(async () => ({
     profiles: [
