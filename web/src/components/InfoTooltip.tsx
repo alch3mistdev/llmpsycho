@@ -4,6 +4,7 @@ import {
   autoUpdate,
   flip,
   offset,
+  safePolygon,
   shift,
   useDismiss,
   useFloating,
@@ -34,6 +35,12 @@ export function InfoTooltip({
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
   const { setPinnedTooltip } = useStudioStore();
+  const pinTooltip = () =>
+    setPinnedTooltip({
+      id,
+      title,
+      content: `${definition}\n\nWhy it matters: ${whyItMatters}\n\nDecision: ${decisionImplication}`
+    });
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -43,7 +50,7 @@ export function InfoTooltip({
     whileElementsMounted: autoUpdate
   });
 
-  const hover = useHover(context, { move: false });
+  const hover = useHover(context, { move: false, handleClose: safePolygon(), delay: { close: 180 } });
   const focus = useFocus(context);
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: "tooltip" });
@@ -68,13 +75,11 @@ export function InfoTooltip({
               <button
                 type="button"
                 className="pin-button"
-                onClick={() =>
-                  setPinnedTooltip({
-                    id,
-                    title,
-                    content: `${definition}\n\nWhy it matters: ${whyItMatters}\n\nDecision: ${decisionImplication}`
-                  })
-                }
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  pinTooltip();
+                }}
+                onClick={pinTooltip}
               >
                 Pin
               </button>

@@ -1,26 +1,26 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
 :root {
-  --ink-strong: #020617;
-  --ink: #0f172a;
-  --ink-soft: #334155;
-  --bg: #f7f5f0;
-  --bg-alt: #eef5fb;
-  --card: rgba(255, 255, 255, 0.88);
-  --card-strong: rgba(255, 255, 255, 0.95);
-  --line: #dbe4ef;
-  --accent: #ea580c;
-  --accent-2: #0891b2;
-  --accent-3: #ca8a04;
-  --surface-1: rgba(255, 255, 255, 0.78);
-  --surface-2: rgba(255, 255, 255, 0.62);
+  --ink-strong: #0f172a;
+  --ink: #1e293b;
+  --ink-soft: #475569;
+  --bg: #f4f7fb;
+  --bg-alt: #e2e8f0;
+  --card: rgba(255, 255, 255, 0.94);
+  --card-strong: rgba(255, 255, 255, 0.98);
+  --line: #cbd5e1;
+  --accent: #2563eb;
+  --accent-2: #0f766e;
+  --accent-3: #7c3aed;
+  --surface-1: rgba(255, 255, 255, 0.92);
+  --surface-2: rgba(255, 255, 255, 0.84);
   --good: #0f766e;
   --warn: #ca8a04;
   --low: #b91c1c;
   --danger: #b91c1c;
-  --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 22px 44px rgba(15, 23, 42, 0.18);
-  --focus: 0 0 0 3px rgba(14, 116, 144, 0.28);
+  --shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 18px 36px rgba(15, 23, 42, 0.14);
+  --focus: 0 0 0 3px rgba(37, 99, 235, 0.28);
   --duration-fast: 150ms;
   --duration-medium: 260ms;
   --duration-slow: 420ms;
@@ -32,12 +32,11 @@
 
 body {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Inter", sans-serif;
   color: var(--ink-strong);
   background:
-    radial-gradient(circle at 8% 10%, rgba(8, 145, 178, 0.18), transparent 45%),
-    radial-gradient(circle at 88% 6%, rgba(234, 88, 12, 0.2), transparent 35%),
-    radial-gradient(circle at 42% 112%, rgba(202, 138, 4, 0.14), transparent 32%),
+    radial-gradient(circle at 10% 12%, rgba(37, 99, 235, 0.12), transparent 42%),
+    radial-gradient(circle at 82% 8%, rgba(15, 118, 110, 0.11), transparent 34%),
     linear-gradient(160deg, var(--bg) 0%, var(--bg-alt) 100%);
   min-height: 100vh;
 }
@@ -49,7 +48,7 @@ textarea,
 select,
 button,
 table {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 h1,
@@ -72,11 +71,11 @@ p {
 .topbar {
   margin-bottom: 20px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 14px;
   box-shadow: var(--shadow);
   background: var(--card);
   backdrop-filter: blur(6px);
-  padding: 18px;
+  padding: 16px;
 }
 
 .brand-block h1 {
@@ -117,7 +116,7 @@ p {
 
 .mode-chip.active {
   border-color: var(--accent);
-  background: linear-gradient(140deg, rgba(234, 88, 12, 0.2), rgba(8, 145, 178, 0.16));
+  background: linear-gradient(140deg, rgba(37, 99, 235, 0.15), rgba(15, 118, 110, 0.14));
 }
 
 .nav-tabs {
@@ -140,7 +139,7 @@ p {
 .nav-tab.active,
 .nav-tab:hover {
   border-color: var(--accent);
-  background: linear-gradient(130deg, rgba(234, 88, 12, 0.18), rgba(8, 145, 178, 0.16));
+  background: linear-gradient(130deg, rgba(37, 99, 235, 0.13), rgba(15, 118, 110, 0.12));
 }
 
 .page-shell {
@@ -266,7 +265,7 @@ button {
 
 button {
   cursor: pointer;
-  background: linear-gradient(140deg, rgba(234, 88, 12, 0.15), rgba(8, 145, 178, 0.16));
+  background: linear-gradient(140deg, rgba(37, 99, 235, 0.1), rgba(15, 118, 110, 0.08));
 }
 
 button:hover {
@@ -410,7 +409,7 @@ pre {
 }
 
 .chip.active {
-  background: rgba(234, 88, 12, 0.15);
+  background: rgba(37, 99, 235, 0.12);
   border-color: var(--accent);
 }
 

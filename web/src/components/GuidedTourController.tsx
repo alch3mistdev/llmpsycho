@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import Shepherd from "shepherd.js";
+import type { Tour } from "shepherd.js";
 import "shepherd.js/dist/css/shepherd.css";
 
 import { useStudioStore } from "../store/useStudioStore";
 
-let activeTour: Shepherd.Tour | null = null;
+let activeTour: Tour | null = null;
 
-function buildTour(): Shepherd.Tour {
+function buildTour(): Tour {
   const tour = new Shepherd.Tour({
     useModalOverlay: true,
     defaultStepOptions: {
