@@ -1,4 +1,5 @@
 export type Provider = "openai" | "anthropic" | "simulated";
+export type ExplanationMode = "Simple" | "Guided" | "Technical";
 
 export interface RunCreateRequest {
   model_id: string;
@@ -47,6 +48,40 @@ export interface TraitEstimate {
   reliability: number;
 }
 
+export interface ProfileStrengthOrRisk {
+  trait: string;
+  name: string;
+  score: number;
+  label: string;
+  summary: string;
+}
+
+export interface ProfileSummary {
+  strengths: ProfileStrengthOrRisk[];
+  risks: ProfileStrengthOrRisk[];
+  recommended_usage: string[];
+  cautionary_usage: string[];
+  quick_take: string;
+}
+
+export interface RegimeDelta {
+  trait: string;
+  name: string;
+  core: number;
+  safety: number;
+  delta: number;
+  direction: "up" | "down" | "flat";
+}
+
+export interface TraitDriver {
+  trait: string;
+  trait_name: string;
+  rule: string;
+  score: number;
+  influence: number;
+  direction: "risk" | "support";
+}
+
 export interface ProfileDetail {
   profile_id: string;
   metadata: Record<string, unknown>;
@@ -58,8 +93,10 @@ export interface ProfileDetail {
     risk_flags: Record<string, boolean>;
     budget: {
       calls_used: number;
-      tokens_prompt: number;
-      tokens_completion: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      tokens_prompt?: number;
+      tokens_completion?: number;
     };
     regimes: Array<{
       regime_id: string;
@@ -67,6 +104,21 @@ export interface ProfileDetail {
     }>;
     records?: Array<Record<string, unknown>>;
   };
+  profile_summary?: ProfileSummary;
+  regime_deltas?: RegimeDelta[];
+  trait_driver_map?: TraitDriver[];
+  explainability_version?: number;
+}
+
+export interface ProfileExplainResponse {
+  profile_id: string;
+  index: ProfileIndex;
+  regime_id: string;
+  quick_take: string;
+  summary: ProfileSummary;
+  regime_delta_note: string;
+  top_drivers: TraitDriver[];
+  explainability_version: number;
 }
 
 export interface IngestionStatus {
@@ -77,6 +129,81 @@ export interface IngestionStatus {
   recent: Array<Record<string, unknown>>;
 }
 
+export interface InterventionPlan {
+  tier: string;
+  strategy: string;
+  decoding: Record<string, unknown>;
+  system_addendum: string;
+  query_prefix: string;
+  max_tokens: number;
+  rationale: string[];
+  rules_applied: string[];
+}
+
+export interface QueryResult {
+  response_text: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  latency_ms: number;
+}
+
+export interface ResponseMetrics {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number;
+  intent_coverage: number;
+  safety_score: number;
+  structural_compliance: number;
+}
+
+export interface AlignmentRubricScore {
+  name: string;
+  weight: number;
+  judge_score: number | null;
+  deterministic_score: number;
+  merged_score: number;
+  confidence: number;
+  confidence_label: "High" | "Medium" | "Low";
+  rationale: string;
+}
+
+export interface AlignmentReport {
+  overall_score: number;
+  tier: "Excellent" | "Good" | "Weak" | "At Risk";
+  rubric_scores: AlignmentRubricScore[];
+  confidence: number;
+  confidence_label: "High" | "Medium" | "Low";
+  evaluator_model_id: string | null;
+  mode: "hybrid" | "deterministic_only";
+}
+
+export interface InterventionAttribution {
+  rule: string;
+  traits: string[];
+  primary_contribution: number;
+  counterfactual_drop_estimate: number;
+  confidence: number;
+  direction: "positive" | "neutral";
+}
+
+export interface CausalRuleTrace {
+  rule: string;
+  condition: string;
+  traits: string[];
+  expected_effects: string[];
+  triggered: boolean;
+}
+
+export interface InterventionCausalTrace {
+  selected_traits: Array<{ trait: string; value: number }>;
+  triggered_rules: CausalRuleTrace[];
+  non_triggered_rules: CausalRuleTrace[];
+  transformations: Array<{ type: string; value: unknown }>;
+  expected_effects: string[];
+  attribution: InterventionAttribution[];
+}
+
 export interface AbRequest {
   profile_id: string;
   provider: Provider;
@@ -85,6 +212,7 @@ export interface AbRequest {
   regime_id: string;
   ab_mode: "same_model";
   adapter_config?: Record<string, unknown>;
+  disabled_rules?: string[];
 }
 
 export interface ApplyRequest {
@@ -94,4 +222,119 @@ export interface ApplyRequest {
   query_text: string;
   regime_id: string;
   adapter_config?: Record<string, unknown>;
+  disabled_rules?: string[];
+}
+
+export interface QueryLabEvaluateRequest {
+  query_text: string;
+  response_text: string;
+  provider: Provider;
+  model_id: string;
+  profile_id?: string;
+  regime_id: string;
+  adapter_config?: Record<string, unknown>;
+}
+
+export interface ApplyResponse {
+  profile_id: string;
+  provider: Provider;
+  model_id: string;
+  intervention_plan: InterventionPlan;
+  result: QueryResult;
+  metrics: ResponseMetrics;
+  alignment_report: AlignmentReport;
+  causal_trace: InterventionCausalTrace;
+  confidence: number;
+  evaluation_trace_id: string;
+  intervention_trace_id: string;
+}
+
+export interface AbResponse {
+  session_id: string;
+  profile_id: string;
+  provider: Provider;
+  model_id: string;
+  intervention_plan: InterventionPlan;
+  baseline: QueryResult;
+  treated: QueryResult;
+  metrics: {
+    baseline: ResponseMetrics;
+    treated: ResponseMetrics;
+  };
+  alignment_report: {
+    baseline: AlignmentReport;
+    treated: AlignmentReport;
+    delta: {
+      overall_delta: number;
+      rubric_deltas: Record<string, number>;
+    };
+  };
+  attribution: InterventionAttribution[];
+  causal_trace: InterventionCausalTrace;
+  evaluation_trace_ids: {
+    baseline: string;
+    treated: string;
+    intervention: string;
+  };
+  diff: {
+    latency_delta_ms: number;
+    token_delta: number;
+    intent_delta: number;
+    safety_delta: number;
+    structure_delta: number;
+    response_diff: string;
+  };
+}
+
+export interface EvaluateResponse {
+  trace_id: string;
+  alignment_report: AlignmentReport;
+  confidence: number;
+}
+
+export interface QueryLabTraceResponse {
+  trace_type: "evaluation" | "intervention";
+  trace: Record<string, unknown>;
+}
+
+export interface MetaModel {
+  provider: Provider;
+  model_id: string;
+  label: string;
+  available_hint: string;
+  source: string;
+}
+
+export interface MetaModelsResponse {
+  models: MetaModel[];
+  refreshed_at?: string;
+  errors?: Record<string, string>;
+}
+
+export interface QueryLabAnalyticsResponse {
+  trend: Array<{
+    timestamp: string;
+    session_id: string;
+    intent_delta: number;
+    safety_delta: number;
+    token_delta: number;
+  }>;
+  effective_interventions: Array<{
+    rule: string;
+    count: number;
+    avg_intent_delta: number;
+    avg_safety_delta: number;
+    score: number;
+  }>;
+  total_ab_runs: number;
+}
+
+export interface GlossaryResponse {
+  traits: Record<string, { name: string; simple: string }>;
+  metrics: Record<string, string>;
+  risk_flags: Record<string, string>;
+  confidence_labels: Record<string, string>;
+  feature_flags: {
+    explainability_v2: boolean;
+  };
 }

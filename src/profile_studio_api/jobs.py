@@ -16,6 +16,7 @@ from adaptive_profiler.config import RegimeConfig
 from adaptive_profiler.simulate import SimulatedModelAdapter, sample_true_thetas
 
 from .models import RunCreateRequest
+from .profile_explain import build_profile_summary, build_regime_deltas, build_trait_driver_map
 from .repository import ProfileStudioRepository
 from .settings import AppSettings
 
@@ -144,7 +145,14 @@ class RunJobManager:
             "created_at": _utc_now(),
             "version": 1,
         }
-        envelope = {"metadata": metadata, "profile": report_dict}
+        envelope = {
+            "metadata": metadata,
+            "profile": report_dict,
+            "profile_summary": build_profile_summary(report_dict, regime_id="core"),
+            "regime_deltas": build_regime_deltas(report_dict),
+            "trait_driver_map": build_trait_driver_map(report_dict, regime_id="core"),
+            "explainability_version": 2,
+        }
         raw = _json_bytes(envelope)
         checksum = _sha256_bytes(raw)
 

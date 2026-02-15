@@ -2,6 +2,14 @@
 
 Adaptive psychometric profiling for LLMs, plus a local **Profile Studio** for creating, ingesting, exploring, and applying profiles with A/B intervention testing.
 
+## Stage 2 Focus
+
+Stage 2 prioritizes:
+
+- **Intent-result alignment accuracy** via hybrid evaluation (deterministic checks + evaluator model rubric).
+- **Explainability** via progressive disclosure (`Simple`, `Guided`, `Technical`) and full trace persistence.
+- **Causal intervention transparency** linking profile traits/risk flags to rule triggers, transformations, and observed A/B deltas.
+
 ## What This Project Does
 
 `llmpsycho` helps you measure an LLM as a latent trait profile (capability + alignment behavior), then operationalize that profile in an interactive UX.
@@ -36,6 +44,8 @@ Default convergence-focused settings:
 - Async run jobs with live SSE stream for Run Studio telemetry.
 - Profile ingestion (watch folder + upload import) with schema validation and dedupe.
 - Query Lab endpoints for apply-only and same-model A/B.
+- Hybrid alignment scoring with confidence bands.
+- Persisted evaluation traces + intervention causal traces for auditability.
 - Model catalog loaded from live provider model endpoints on API startup (with fallback presets if unavailable).
 
 ### 3) Frontend UX (`web`)
@@ -44,9 +54,9 @@ React + TypeScript + Vite app with:
 
 - **Dashboard**: health/risk/history snapshots.
 - **Run Studio**: launch runs, watch stage timeline + budget burn + event feed.
-- **Profile Explorer**: inspect traits, confidence, diagnostics, risk flags.
+- **Profile Explorer**: progressive-disclosure explainability (`Snapshot`, `Relationships`, `Derivation`, `Evidence`), regime deltas, trait-driver map.
 - **Ingestion Center**: watch-folder status, scan, upload, error visibility.
-- **Query Lab**: intervention plan preview, side-by-side A/B outputs and metric deltas.
+- **Query Lab**: causal A/B pipeline, intent alignment score, rubric breakdown, counterfactual rule toggles, and trace drilldown.
 
 ## Repository Layout
 
@@ -152,7 +162,11 @@ Created/used by backend startup:
 - `GET /api/ingestion/status`
 - `POST /api/query-lab/ab`
 - `POST /api/query-lab/apply`
+- `POST /api/query-lab/evaluate`
+- `GET /api/query-lab/traces/{trace_id}`
+- `GET /api/query-lab/analytics`
 - `GET /api/meta/models`
+- `GET /api/meta/glossary`
 
 ## Model Catalog Behavior
 
@@ -182,6 +196,7 @@ Note: API integration tests requiring FastAPI are skipped if `fastapi` is not in
 - `docs/operations_ingestion_and_history.md`
 - `docs/examples_end_to_end_workflows.md`
 - `docs/convergence_first_budget_update.md`
+- `docs/stage2_explainable_alignment_ux.md`
 
 ## Typical Workflows
 

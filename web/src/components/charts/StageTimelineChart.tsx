@@ -4,19 +4,34 @@ interface StageTimelineChartProps {
   events: Array<Record<string, unknown>>;
 }
 
+function stagePoints(events: Array<Record<string, unknown>>, stage: "A" | "B" | "C"): Array<[number, number]> {
+  const rows: Array<[number, number]> = [];
+  for (const event of events) {
+    if (String(event.eventType ?? "") !== "progress") {
+      continue;
+    }
+    if (String(event.stage ?? "") !== stage) {
+      continue;
+    }
+    const call = Number(event.call_index ?? 0) + 1;
+    const y = stage === "A" ? 1 : stage === "B" ? 2 : 3;
+    rows.push([call, y]);
+  }
+  return rows;
+}
+
 export function StageTimelineChart({ events }: StageTimelineChartProps) {
-  const data = events
-    .map((event, index) => {
-      const stage = String(event.stage ?? "");
-      if (stage !== "A" && stage !== "B" && stage !== "C") {
-        return null;
-      }
-      return [index + 1, `Stage ${stage}`];
-    })
-    .filter((row): row is [number, string] => Array.isArray(row));
+  const aPoints = stagePoints(events, "A");
+  const bPoints = stagePoints(events, "B");
+  const cPoints = stagePoints(events, "C");
 
   const option = {
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "item",
+      formatter: (params: { value: [number, number]; seriesName: string }) => {
+        return `${params.seriesName}<br/>Call ${params.value[0]}`;
+      }
+    },
     xAxis: {
       type: "value",
       name: "Call",
@@ -28,29 +43,52 @@ export function StageTimelineChart({ events }: StageTimelineChartProps) {
       }
     },
     yAxis: {
-      type: "category",
-      data: ["Stage A", "Stage B", "Stage C"],
+      type: "value",
+      min: 0.5,
+      max: 3.5,
+      interval: 1,
       axisLabel: {
+        formatter: (value: number) => {
+          if (value === 1) {
+            return "Stage A";
+          }
+          if (value === 2) {
+            return "Stage B";
+          }
+          if (value === 3) {
+            return "Stage C";
+          }
+          return "";
+        },
         color: "#1f2937",
         fontFamily: "'Space Grotesk', sans-serif"
       }
     },
+    legend: {
+      data: ["Stage A", "Stage B", "Stage C"],
+      bottom: 0
+    },
     series: [
       {
-        type: "line",
-        smooth: true,
-        symbolSize: 7,
-        data,
-        lineStyle: {
-          color: "#0891b2",
-          width: 3
-        },
-        areaStyle: {
-          color: "rgba(8,145,178,0.2)"
-        },
-        itemStyle: {
-          color: "#f97316"
-        }
+        name: "Stage A",
+        type: "scatter",
+        symbolSize: 9,
+        itemStyle: { color: "#0284c7" },
+        data: aPoints
+      },
+      {
+        name: "Stage B",
+        type: "scatter",
+        symbolSize: 9,
+        itemStyle: { color: "#ea580c" },
+        data: bPoints
+      },
+      {
+        name: "Stage C",
+        type: "scatter",
+        symbolSize: 9,
+        itemStyle: { color: "#0f766e" },
+        data: cPoints
       }
     ]
   };

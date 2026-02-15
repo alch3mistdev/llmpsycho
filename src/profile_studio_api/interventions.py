@@ -43,6 +43,40 @@ class InterventionPlan:
         return asdict(self)
 
 
+RULE_METADATA: dict[str, dict[str, Any]] = {
+    "low_refusal_or_jailbreak": {
+        "condition": "T8 < 0 or T9 < 0",
+        "traits": ["T8", "T9"],
+        "expected_effects": ["safety_increase", "harm_reduction", "token_reduction"],
+    },
+    "low_intent_understanding": {
+        "condition": "T5 < 0",
+        "traits": ["T5"],
+        "expected_effects": ["clarity_increase", "intent_alignment_increase"],
+    },
+    "low_calibration": {
+        "condition": "T4 < 0",
+        "traits": ["T4"],
+        "expected_effects": ["uncertainty_honesty_increase", "hallucination_risk_reduction"],
+    },
+    "low_truthfulness_or_overfit": {
+        "condition": "T6 < 0.1 or benchmark_overfit",
+        "traits": ["T6"],
+        "expected_effects": ["grounding_increase", "factual_risk_reduction"],
+    },
+    "high_capability_compact_mode": {
+        "condition": "T1,T2,T3 all high",
+        "traits": ["T1", "T2", "T3"],
+        "expected_effects": ["token_reduction", "latency_reduction"],
+    },
+    "default_profile_policy": {
+        "condition": "No dominant risk/strength rule activated",
+        "traits": ["T5", "T8"],
+        "expected_effects": ["baseline_alignment_guardrail"],
+    },
+}
+
+
 def _extract_trait_mean(profile_payload: dict[str, Any], regime_id: str, trait: str) -> float:
     regimes = profile_payload.get("regimes", [])
     for regime in regimes:
@@ -63,6 +97,7 @@ def derive_intervention_plan(
     *,
     regime_id: str = "core",
     objective: str = "safety_intent",
+    disabled_rules: list[str] | None = None,
 ) -> InterventionPlan:
     t1 = _extract_trait_mean(profile_payload, regime_id, "T1")
     t2 = _extract_trait_mean(profile_payload, regime_id, "T2")
@@ -139,6 +174,13 @@ def derive_intervention_plan(
         rationale.append("Default L1 guardrails maintain intent fidelity with moderate efficiency.")
         rules.append("default_profile_policy")
 
+    disabled = set(disabled_rules or [])
+    if disabled:
+        rules = [rule for rule in rules if rule not in disabled]
+        if not rules:
+            rules = ["default_profile_policy"]
+            rationale.append("All requested rules were disabled; falling back to default profile policy.")
+
     return InterventionPlan(
         tier=tier,
         strategy=strategy,
@@ -149,6 +191,127 @@ def derive_intervention_plan(
         rationale=rationale,
         rules_applied=rules,
     )
+
+
+def build_intervention_causal_trace(
+    profile_payload: dict[str, Any],
+    *,
+    regime_id: str,
+    plan: InterventionPlan,
+    observed_diff: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    selected_traits: list[dict[str, Any]] = []
+    regime_entries = profile_payload.get("regimes", [])
+    trait_values: dict[str, float] = {}
+    for regime in regime_entries:
+        if regime.get("regime_id") != regime_id:
+            continue
+        for estimate in regime.get("trait_estimates", []):
+            trait = str(estimate.get("trait", ""))
+            try:
+                value = float(estimate.get("mean", 0.0))
+            except (TypeError, ValueError):
+                value = 0.0
+            trait_values[trait] = value
+
+    for trait, value in sorted(trait_values.items()):
+        selected_traits.append({"trait": trait, "value": value})
+
+    triggered_rules: list[dict[str, Any]] = []
+    for rule in plan.rules_applied:
+        meta = RULE_METADATA.get(rule, {})
+        triggered_rules.append(
+            {
+                "rule": rule,
+                "condition": meta.get("condition", "custom"),
+                "traits": meta.get("traits", []),
+                "expected_effects": meta.get("expected_effects", []),
+                "triggered": True,
+            }
+        )
+
+    non_triggered = [
+        {
+            "rule": name,
+            "condition": meta.get("condition", "custom"),
+            "traits": meta.get("traits", []),
+            "expected_effects": meta.get("expected_effects", []),
+            "triggered": False,
+        }
+        for name, meta in RULE_METADATA.items()
+        if name not in plan.rules_applied
+    ]
+
+    transformations: list[dict[str, Any]] = []
+    if plan.query_prefix:
+        transformations.append({"type": "query_prefix", "value": plan.query_prefix})
+    if plan.system_addendum:
+        transformations.append({"type": "system_addendum", "value": plan.system_addendum})
+    transformations.append({"type": "decoding", "value": dict(plan.decoding)})
+    transformations.append({"type": "max_tokens", "value": plan.max_tokens})
+
+    expected_effects = sorted(
+        {
+            effect
+            for rule in plan.rules_applied
+            for effect in RULE_METADATA.get(rule, {}).get("expected_effects", [])
+        }
+    )
+
+    attribution = estimate_rule_attribution(
+        plan=plan,
+        trait_values=trait_values,
+        observed_diff=observed_diff or {},
+    )
+
+    return {
+        "selected_traits": selected_traits,
+        "triggered_rules": triggered_rules,
+        "non_triggered_rules": non_triggered,
+        "transformations": transformations,
+        "expected_effects": expected_effects,
+        "attribution": attribution,
+    }
+
+
+def estimate_rule_attribution(
+    *,
+    plan: InterventionPlan,
+    trait_values: dict[str, float],
+    observed_diff: dict[str, Any],
+) -> list[dict[str, Any]]:
+    intent_delta = float(observed_diff.get("intent_delta", 0.0) or 0.0)
+    safety_delta = float(observed_diff.get("safety_delta", 0.0) or 0.0)
+    token_delta = float(observed_diff.get("token_delta", 0.0) or 0.0)
+
+    out: list[dict[str, Any]] = []
+    for rule in plan.rules_applied:
+        meta = RULE_METADATA.get(rule, {})
+        traits = list(meta.get("traits", []))
+        if traits:
+            deficit = sum(abs(float(trait_values.get(t, 0.0))) for t in traits) / max(1, len(traits))
+        else:
+            deficit = 0.2
+
+        primary_score = 0.45 * max(0.0, safety_delta) + 0.35 * max(0.0, intent_delta) + 0.20 * max(0.0, -token_delta / 100.0)
+        primary_score += 0.25 * deficit
+        primary_score = max(0.0, min(1.0, primary_score))
+
+        counterfactual_drop = max(0.0, min(1.0, 0.75 * primary_score))
+        confidence = max(0.35, min(0.95, 0.55 + 0.35 * primary_score))
+        out.append(
+            {
+                "rule": rule,
+                "traits": traits,
+                "primary_contribution": round(primary_score, 4),
+                "counterfactual_drop_estimate": round(counterfactual_drop, 4),
+                "confidence": round(confidence, 4),
+                "direction": "positive" if primary_score >= 0.2 else "neutral",
+            }
+        )
+
+    out.sort(key=lambda row: float(row.get("primary_contribution", 0.0)), reverse=True)
+    return out
 
 
 def build_treated_query(query_text: str, plan: InterventionPlan) -> str:

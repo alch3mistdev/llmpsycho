@@ -55,10 +55,21 @@ class QueryLabRequest(BaseModel):
     query_text: str = Field(min_length=1)
     regime_id: str = "core"
     adapter_config: dict[str, Any] = Field(default_factory=dict)
+    disabled_rules: list[str] = Field(default_factory=list)
 
 
 class QueryLabABRequest(QueryLabRequest):
     ab_mode: Literal["same_model"] = "same_model"
+
+
+class QueryLabEvaluateRequest(BaseModel):
+    query_text: str = Field(min_length=1)
+    response_text: str = Field(min_length=1)
+    provider: Provider = "simulated"
+    model_id: str = Field(default="evaluator-default")
+    profile_id: str | None = None
+    regime_id: str = "core"
+    adapter_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class MetaModelsResponse(BaseModel):

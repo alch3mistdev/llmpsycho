@@ -5,11 +5,14 @@
   --ink-soft: #334155;
   --bg: #fffaf2;
   --bg-alt: #f8fbff;
-  --card: rgba(255, 255, 255, 0.86);
+  --card: rgba(255, 255, 255, 0.88);
   --line: #dbe4ef;
   --accent: #ea580c;
   --accent-2: #0891b2;
   --accent-3: #ca8a04;
+  --good: #0f766e;
+  --warn: #ca8a04;
+  --low: #b91c1c;
   --danger: #b91c1c;
   --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
@@ -46,8 +49,12 @@ h4 {
   margin: 0;
 }
 
+p {
+  margin: 0;
+}
+
 .app-shell {
-  max-width: 1320px;
+  max-width: 1360px;
   margin: 0 auto;
   padding: 20px 16px 60px;
 }
@@ -70,6 +77,37 @@ h4 {
 .brand-block p {
   margin: 8px 0 0;
   color: var(--ink-soft);
+}
+
+.mode-bar {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mode-bar > span {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.mode-switch {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.mode-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  padding: 6px 12px;
+}
+
+.mode-chip.active {
+  border-color: var(--accent);
+  background: linear-gradient(140deg, rgba(234, 88, 12, 0.2), rgba(8, 145, 178, 0.16));
 }
 
 .nav-tabs {
@@ -149,7 +187,7 @@ h4 {
 }
 
 .metric-card strong {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   color: var(--accent-2);
 }
 
@@ -159,6 +197,15 @@ h4 {
 
 .panel-card > h3 {
   margin-bottom: 12px;
+}
+
+.plain-card {
+  border-left: 4px solid var(--accent-2);
+}
+
+.plain-summary {
+  color: var(--ink-soft);
+  line-height: 1.45;
 }
 
 .grid-2 {
@@ -204,6 +251,7 @@ button {
   padding: 10px 12px;
   font-size: 0.92rem;
   background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
 }
 
 button {
@@ -218,6 +266,27 @@ button:hover {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+legend {
+  color: var(--ink-soft);
+  padding: 0 6px;
+}
+
+.check-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.check-row input {
+  margin: 0;
 }
 
 .inline-actions {
@@ -292,6 +361,7 @@ pre {
   justify-content: space-between;
   border-bottom: 1px dashed var(--line);
   padding: 8px 0;
+  gap: 12px;
 }
 
 .hint {
@@ -303,10 +373,12 @@ pre {
   color: var(--danger);
 }
 
-.regime-tabs {
+.regime-tabs,
+.tab-row {
   display: flex;
   gap: 8px;
   margin: 10px 0;
+  flex-wrap: wrap;
 }
 
 .chip {
@@ -314,6 +386,7 @@ pre {
   padding: 6px 11px;
   border: 1px solid var(--line);
   background: white;
+  color: var(--ink);
 }
 
 .chip.active {
@@ -329,6 +402,137 @@ pre {
   gap: 9px;
 }
 
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-popover {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.metric-popover summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.metric-popover p {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.confidence-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.confidence-badge.high {
+  color: var(--good);
+  border-color: rgba(15, 118, 110, 0.4);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.confidence-badge.medium {
+  color: var(--warn);
+  border-color: rgba(202, 138, 4, 0.35);
+  background: rgba(202, 138, 4, 0.1);
+}
+
+.confidence-badge.low {
+  color: var(--low);
+  border-color: rgba(185, 28, 28, 0.35);
+  background: rgba(185, 28, 28, 0.1);
+}
+
+.confidence-chip-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.confidence-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 16px;
+}
+
+.rule-toggle-group {
+  display: grid;
+  gap: 6px;
+}
+
+.attribution-list {
+  display: grid;
+  gap: 10px;
+}
+
+.attribution-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.attribution-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.attribution-metrics {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.86rem;
+}
+
+.tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.tag.good {
+  color: var(--good);
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
+.evidence-drawer {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.evidence-drawer summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
 @media (max-width: 980px) {
   .grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -336,7 +540,10 @@ pre {
 
   .grid-3,
   .grid-2,
-  .form-grid {
+  .form-grid,
+  .lab-grid,
+  .glossary-grid,
+  .confidence-chip-row {
     grid-template-columns: 1fr;
   }
 }

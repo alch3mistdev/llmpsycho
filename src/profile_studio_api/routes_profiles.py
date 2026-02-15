@@ -10,6 +10,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from .deps import get_services
 from .models import ProfileImportResponse
+from .profile_explain import (
+    build_profile_summary,
+    build_regime_deltas,
+    build_trait_driver_map,
+    explain_profile,
+)
 from .services import AppServices
 
 
@@ -53,11 +59,51 @@ def get_profile(profile_id: str, services: AppServices = Depends(get_services)) 
         metadata = {}
         profile_payload = payload
 
+    explainability_enabled = services.settings.explainability_v2_enabled
+    regime_id = "core"
+    profile_summary = build_profile_summary(profile_payload, regime_id=regime_id) if explainability_enabled else None
+    regime_deltas = build_regime_deltas(profile_payload) if explainability_enabled else None
+    trait_driver_map = build_trait_driver_map(profile_payload, regime_id=regime_id) if explainability_enabled else None
+
     return {
         "profile_id": profile_id,
         "index": row,
         "metadata": metadata,
         "profile": profile_payload,
+        "profile_summary": profile_summary,
+        "regime_deltas": regime_deltas,
+        "trait_driver_map": trait_driver_map,
+        "explainability_version": 2 if explainability_enabled else 1,
+    }
+
+
+@router.get("/profiles/{profile_id}/explain")
+def get_profile_explain(profile_id: str, regime_id: str = "core", services: AppServices = Depends(get_services)) -> dict[str, Any]:
+    if not services.settings.explainability_v2_enabled:
+        raise HTTPException(status_code=404, detail="Explainability v2 is disabled")
+
+    row = services.repository.get_profile(profile_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    artifact_path = Path(row["artifact_path"])
+    if not artifact_path.exists():
+        raise HTTPException(status_code=500, detail="Profile artifact file missing")
+
+    with artifact_path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    if isinstance(payload, dict) and "profile" in payload and isinstance(payload["profile"], dict):
+        profile_payload = payload["profile"]
+    elif isinstance(payload, dict):
+        profile_payload = payload
+    else:
+        raise HTTPException(status_code=500, detail="Profile artifact payload is invalid")
+
+    return {
+        "profile_id": profile_id,
+        "index": row,
+        **explain_profile(profile_payload, regime_id=regime_id),
     }
 
 

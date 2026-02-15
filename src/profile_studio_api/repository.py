@@ -22,6 +22,7 @@ class ProfileStudioRepository:
         self.db_path = db_path
         self._lock = threading.Lock()
         self._init_db()
+        self._apply_migrations()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
@@ -118,10 +119,52 @@ class ProfileStudioRepository:
                     metrics_json TEXT NOT NULL,
                     diff_json TEXT NOT NULL,
                     intervention_json TEXT NOT NULL,
+                    baseline_trace_id TEXT,
+                    treated_trace_id TEXT,
+                    intervention_trace_id TEXT,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS evaluation_traces (
+                    trace_id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    profile_id TEXT,
+                    run_id TEXT,
+                    context_json TEXT NOT NULL,
+                    alignment_report_json TEXT NOT NULL,
+                    trace_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_evaluation_traces_session_id ON evaluation_traces(session_id);
+                CREATE INDEX IF NOT EXISTS idx_evaluation_traces_profile_id ON evaluation_traces(profile_id);
+
+                CREATE TABLE IF NOT EXISTS intervention_traces (
+                    trace_id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    profile_id TEXT NOT NULL,
+                    regime_id TEXT NOT NULL,
+                    plan_json TEXT NOT NULL,
+                    causal_trace_json TEXT NOT NULL,
+                    attribution_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_intervention_traces_session_id ON intervention_traces(session_id);
                 """
             )
+
+    def _apply_migrations(self) -> None:
+        with self._lock, self._connect() as conn:
+            # Additive migration for older stage-1 DBs.
+            table_info = conn.execute("PRAGMA table_info(ab_results)").fetchall()
+            cols = {row["name"] for row in table_info}
+            if "baseline_trace_id" not in cols:
+                conn.execute("ALTER TABLE ab_results ADD COLUMN baseline_trace_id TEXT")
+            if "treated_trace_id" not in cols:
+                conn.execute("ALTER TABLE ab_results ADD COLUMN treated_trace_id TEXT")
+            if "intervention_trace_id" not in cols:
+                conn.execute("ALTER TABLE ab_results ADD COLUMN intervention_trace_id TEXT")
 
     def create_run(
         self,
@@ -434,13 +477,17 @@ class ProfileStudioRepository:
         metrics: dict[str, Any],
         diff: dict[str, Any],
         intervention: dict[str, Any],
+        baseline_trace_id: str | None = None,
+        treated_trace_id: str | None = None,
+        intervention_trace_id: str | None = None,
     ) -> None:
         with self._lock, self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO ab_results (
-                    session_id, baseline_json, treated_json, metrics_json, diff_json, intervention_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    session_id, baseline_json, treated_json, metrics_json, diff_json, intervention_json,
+                    baseline_trace_id, treated_trace_id, intervention_trace_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -449,6 +496,9 @@ class ProfileStudioRepository:
                     json.dumps(metrics),
                     json.dumps(diff),
                     json.dumps(intervention),
+                    baseline_trace_id,
+                    treated_trace_id,
+                    intervention_trace_id,
                     _utc_now(),
                 ),
             )
@@ -467,7 +517,131 @@ class ProfileStudioRepository:
                     "metrics": json.loads(row["metrics_json"]),
                     "diff": json.loads(row["diff_json"]),
                     "intervention": json.loads(row["intervention_json"]),
+                    "baseline_trace_id": row["baseline_trace_id"] if "baseline_trace_id" in row.keys() else None,
+                    "treated_trace_id": row["treated_trace_id"] if "treated_trace_id" in row.keys() else None,
+                    "intervention_trace_id": (
+                        row["intervention_trace_id"] if "intervention_trace_id" in row.keys() else None
+                    ),
                     "created_at": row["created_at"],
                 }
             )
         return out
+
+    def list_recent_ab_results(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM ab_results ORDER BY created_at DESC LIMIT ?",
+                (max(1, min(limit, 2000)),),
+            ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "baseline": json.loads(row["baseline_json"]),
+                    "treated": json.loads(row["treated_json"]),
+                    "metrics": json.loads(row["metrics_json"]),
+                    "diff": json.loads(row["diff_json"]),
+                    "intervention": json.loads(row["intervention_json"]),
+                    "baseline_trace_id": row["baseline_trace_id"] if "baseline_trace_id" in row.keys() else None,
+                    "treated_trace_id": row["treated_trace_id"] if "treated_trace_id" in row.keys() else None,
+                    "intervention_trace_id": (
+                        row["intervention_trace_id"] if "intervention_trace_id" in row.keys() else None
+                    ),
+                    "created_at": row["created_at"],
+                }
+            )
+        return out
+
+    def create_evaluation_trace(
+        self,
+        *,
+        trace_id: str,
+        session_id: str | None,
+        profile_id: str | None,
+        run_id: str | None,
+        context: dict[str, Any],
+        alignment_report: dict[str, Any],
+        trace: dict[str, Any],
+    ) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO evaluation_traces (
+                    trace_id, session_id, profile_id, run_id, context_json, alignment_report_json, trace_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    trace_id,
+                    session_id,
+                    profile_id,
+                    run_id,
+                    json.dumps(context),
+                    json.dumps(alignment_report),
+                    json.dumps(trace),
+                    _utc_now(),
+                ),
+            )
+
+    def get_evaluation_trace(self, trace_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM evaluation_traces WHERE trace_id = ?", (trace_id,)).fetchone()
+        if row is None:
+            return None
+        return {
+            "trace_id": row["trace_id"],
+            "session_id": row["session_id"],
+            "profile_id": row["profile_id"],
+            "run_id": row["run_id"],
+            "context": json.loads(row["context_json"]),
+            "alignment_report": json.loads(row["alignment_report_json"]),
+            "trace": json.loads(row["trace_json"]),
+            "created_at": row["created_at"],
+        }
+
+    def create_intervention_trace(
+        self,
+        *,
+        trace_id: str,
+        session_id: str | None,
+        profile_id: str,
+        regime_id: str,
+        plan: dict[str, Any],
+        causal_trace: dict[str, Any],
+        attribution: list[dict[str, Any]],
+    ) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO intervention_traces (
+                    trace_id, session_id, profile_id, regime_id, plan_json, causal_trace_json, attribution_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    trace_id,
+                    session_id,
+                    profile_id,
+                    regime_id,
+                    json.dumps(plan),
+                    json.dumps(causal_trace),
+                    json.dumps(attribution),
+                    _utc_now(),
+                ),
+            )
+
+    def get_intervention_trace(self, trace_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM intervention_traces WHERE trace_id = ?", (trace_id,)).fetchone()
+        if row is None:
+            return None
+        return {
+            "trace_id": row["trace_id"],
+            "session_id": row["session_id"],
+            "profile_id": row["profile_id"],
+            "regime_id": row["regime_id"],
+            "plan": json.loads(row["plan_json"]),
+            "causal_trace": json.loads(row["causal_trace_json"]),
+            "attribution": json.loads(row["attribution_json"]),
+            "created_at": row["created_at"],
+        }

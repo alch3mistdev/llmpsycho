@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { createRun, getMetaModels, getRun, subscribeRunEvents } from "../lib/api";
 import { BudgetBurnChart } from "../components/charts/BudgetBurnChart";
+import { CriticalConfidenceChart } from "../components/charts/CriticalConfidenceChart";
 import { StageTimelineChart } from "../components/charts/StageTimelineChart";
-import { useStudioStore } from "../store/useStudioStore";
+import { createRun, getMetaModels, getRun, subscribeRunEvents } from "../lib/api";
 import type { Provider } from "../lib/types";
+import { useStudioStore } from "../store/useStudioStore";
 
 export function RunStudio() {
   const {
@@ -24,7 +25,7 @@ export function RunStudio() {
 
   const modelsQuery = useQuery({
     queryKey: ["meta", "models"],
-    queryFn: getMetaModels
+    queryFn: () => getMetaModels(true)
   });
 
   const runQuery = useQuery({
@@ -55,21 +56,38 @@ export function RunStudio() {
       activeRunId,
       (eventType, data) => {
         pushRunEvent({ eventType, ...(typeof data === "object" && data ? (data as object) : { data }) });
+        if (eventType === "terminal" || eventType === "completed" || eventType === "failed") {
+          setErrorText(null);
+        }
       },
-      (error) => {
-        setErrorText(`SSE error: ${String(error.type)}`);
+      () => {
+        const status = String(runQuery.data?.status ?? "");
+        if (status === "completed" || status === "failed") {
+          return;
+        }
+        setErrorText("Live stream disconnected. Polling status instead.");
       }
     );
 
     return () => close();
-  }, [activeRunId, pushRunEvent]);
+  }, [activeRunId, pushRunEvent, runQuery.data?.status]);
 
   const stageSummary = useMemo(() => {
     const counts = { A: 0, B: 0, C: 0 };
     for (const event of runEvents) {
+      if (String(event.eventType ?? "") !== "progress") {
+        continue;
+      }
       const stage = String(event.stage ?? "");
       if (stage === "A" || stage === "B" || stage === "C") {
         counts[stage] += 1;
+        continue;
+      }
+      const stageCounts = event.stage_counts as Record<string, unknown> | undefined;
+      if (stageCounts) {
+        counts.A = Math.max(counts.A, Number(stageCounts.A ?? counts.A));
+        counts.B = Math.max(counts.B, Number(stageCounts.B ?? counts.B));
+        counts.C = Math.max(counts.C, Number(stageCounts.C ?? counts.C));
       }
     }
     return counts;
@@ -112,16 +130,23 @@ export function RunStudio() {
       },
       run_config_overrides: {
         call_cap: 60,
-        token_cap: 14000
+        token_cap: 14000,
+        min_calls_before_global_stop: 40,
+        min_items_per_critical_trait: 6
       }
     });
   };
+
+  const runSummary = runQuery.data?.summary ?? {};
 
   return (
     <section className="stack">
       <div className="hero-card">
         <h2>Run Studio</h2>
-        <p>Launch adaptive profiling jobs and monitor stage progression, uncertainty convergence, and budget burn.</p>
+        <p>
+          Launch adaptive profiling jobs and monitor stage progression, confidence convergence, and budget burn. Early
+          stopping requires confidence + reliability criteria on critical traits.
+        </p>
       </div>
 
       <form onSubmit={onSubmit} className="panel-card form-grid">
@@ -146,7 +171,7 @@ export function RunStudio() {
         <button type="submit" disabled={createRunMutation.isPending}>
           {createRunMutation.isPending ? "Starting..." : "Create Profile Run"}
         </button>
-        {errorText && <p className="error">{errorText}</p>}
+        {errorText && <p className="hint">{errorText}</p>}
       </form>
 
       <div className="grid-3">
@@ -191,11 +216,29 @@ export function RunStudio() {
       </div>
 
       <article className="panel-card">
+        <h3>Critical Trait Confidence Trajectory</h3>
+        <CriticalConfidenceChart events={runEvents} />
+      </article>
+
+      <article className="panel-card">
+        <h3>Run Quality Summary</h3>
+        <p>
+          {runQuery.data?.status === "completed"
+            ? "Run completed with convergence checks. Use Profile Explorer to inspect trait confidence and risk flags."
+            : "Run is in progress. Convergence quality updates after each adaptive probe."}
+        </p>
+        <pre>{JSON.stringify(runSummary, null, 2)}</pre>
+      </article>
+
+      <article className="panel-card">
         <h3>Run Events</h3>
         <div className="event-feed">
-          {runEvents.slice(-80).reverse().map((event, index) => (
-            <pre key={index}>{JSON.stringify(event, null, 2)}</pre>
-          ))}
+          {runEvents
+            .slice(-80)
+            .reverse()
+            .map((event, index) => (
+              <pre key={index}>{JSON.stringify(event, null, 2)}</pre>
+            ))}
         </div>
       </article>
 

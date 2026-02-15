@@ -99,6 +99,36 @@ class ProfileStudioRepositoryTest(unittest.TestCase):
             self.assertGreaterEqual(len(events), 1)
             self.assertEqual(events[0]["event_type"], "progress")
 
+            repo.create_evaluation_trace(
+                trace_id="trace-eval-1",
+                session_id="sess-1",
+                profile_id="profile-1",
+                run_id="run-1",
+                context={"endpoint": "test"},
+                alignment_report={"overall_score": 0.8},
+                trace={"detail": "ok"},
+            )
+            eval_trace = repo.get_evaluation_trace("trace-eval-1")
+            self.assertIsNotNone(eval_trace)
+            assert eval_trace is not None
+            self.assertEqual(eval_trace["session_id"], "sess-1")
+            self.assertEqual(eval_trace["alignment_report"]["overall_score"], 0.8)
+
+            repo.create_intervention_trace(
+                trace_id="trace-int-1",
+                session_id="sess-1",
+                profile_id="profile-1",
+                regime_id="core",
+                plan={"tier": "L1"},
+                causal_trace={"transformations": []},
+                attribution=[{"rule": "default_profile_policy", "primary_contribution": 0.3}],
+            )
+            intervention_trace = repo.get_intervention_trace("trace-int-1")
+            self.assertIsNotNone(intervention_trace)
+            assert intervention_trace is not None
+            self.assertEqual(intervention_trace["profile_id"], "profile-1")
+            self.assertEqual(intervention_trace["plan"]["tier"], "L1")
+
 
 if __name__ == "__main__":
     unittest.main()

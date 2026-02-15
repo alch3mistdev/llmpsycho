@@ -17,6 +17,9 @@ class AppSettings:
     db_path: Path
     schema_path: Path
     ingestion_scan_interval_seconds: int = 10
+    explainability_v2_enabled: bool = True
+    evaluator_provider: str = "openai"
+    evaluator_model_id: str = "gpt-4.1-mini"
 
     @classmethod
     def load(cls) -> "AppSettings":
@@ -33,6 +36,14 @@ class AppSettings:
             )
         ).resolve()
         scan_interval = int(os.environ.get("LLMPSYCHO_INGESTION_SCAN_SECONDS", "10"))
+        explainability_v2_enabled = os.environ.get("LLMPSYCHO_EXPLAINABILITY_V2", "1").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }
+        evaluator_provider = os.environ.get("LLMPSYCHO_EVALUATOR_PROVIDER", "openai").strip().lower() or "openai"
+        evaluator_model_id = os.environ.get("LLMPSYCHO_EVALUATOR_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
         return cls(
             workspace_root=workspace_root,
             data_dir=data_dir,
@@ -42,6 +53,9 @@ class AppSettings:
             db_path=db_path,
             schema_path=schema_path,
             ingestion_scan_interval_seconds=max(1, scan_interval),
+            explainability_v2_enabled=explainability_v2_enabled,
+            evaluator_provider=evaluator_provider,
+            evaluator_model_id=evaluator_model_id,
         )
 
     def ensure_paths(self) -> None:

@@ -5,6 +5,8 @@ import { IngestionCenter } from "./pages/IngestionCenter";
 import { ProfileExplorer } from "./pages/ProfileExplorer";
 import { QueryLab } from "./pages/QueryLab";
 import { RunStudio } from "./pages/RunStudio";
+import { useStudioStore } from "./store/useStudioStore";
+import type { ExplanationMode } from "./lib/types";
 
 const links = [
   { to: "/", label: "Dashboard" },
@@ -14,14 +16,35 @@ const links = [
   { to: "/ingestion", label: "Ingestion" }
 ];
 
+const explanationModes: ExplanationMode[] = ["Simple", "Guided", "Technical"];
+
 export default function App() {
+  const { explanationMode, setExplanationMode } = useStudioStore();
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-block">
           <h1>LLMPsycho Profile Studio</h1>
-          <p>Interactive profiling, analysis, and profile-applied query optimization.</p>
+          <p>Intent-result accuracy and alignment with explainable intervention evidence.</p>
         </div>
+
+        <div className="mode-bar" aria-label="Explanation mode">
+          <span>Explanation Mode</span>
+          <div className="mode-switch" role="group" aria-label="Explanation mode selector">
+            {explanationModes.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={mode === explanationMode ? "mode-chip active" : "mode-chip"}
+                onClick={() => setExplanationMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <nav className="nav-tabs">
           {links.map((link) => (
             <NavLink

@@ -1,9 +1,18 @@
 import type {
   AbRequest,
+  AbResponse,
   ApplyRequest,
+  ApplyResponse,
+  EvaluateResponse,
+  GlossaryResponse,
   IngestionStatus,
+  MetaModelsResponse,
   ProfileDetail,
+  ProfileExplainResponse,
   ProfileIndex,
+  QueryLabAnalyticsResponse,
+  QueryLabEvaluateRequest,
+  QueryLabTraceResponse,
   RunCreateRequest,
   RunCreateResponse,
   RunStatus
@@ -75,8 +84,6 @@ export function subscribeRunEvents(
   });
 
   source.onerror = (error) => {
-    // EventSource emits "error" when the stream closes; treat terminal close
-    // as expected behavior instead of surfacing a UX error.
     if (closedByTerminal || source.readyState === EventSource.CLOSED) {
       return;
     }
@@ -120,6 +127,10 @@ export function getProfile(profileId: string): Promise<ProfileDetail> {
   return request<ProfileDetail>(`/api/profiles/${profileId}`);
 }
 
+export function getProfileExplain(profileId: string, regimeId = "core"): Promise<ProfileExplainResponse> {
+  return request<ProfileExplainResponse>(`/api/profiles/${profileId}/explain?regime_id=${encodeURIComponent(regimeId)}`);
+}
+
 export async function importProfile(file: File): Promise<{ profile_id: string; status: string; source: string }> {
   const form = new FormData();
   form.append("file", file);
@@ -144,20 +155,40 @@ export function getIngestionStatus(): Promise<IngestionStatus> {
   return request<IngestionStatus>("/api/ingestion/status");
 }
 
-export function getMetaModels(): Promise<{ models: Array<Record<string, unknown>> }> {
-  return request<{ models: Array<Record<string, unknown>> }>("/api/meta/models");
+export function getMetaModels(forceRefresh = false): Promise<MetaModelsResponse> {
+  const query = forceRefresh ? "?force_refresh=true" : "";
+  return request<MetaModelsResponse>(`/api/meta/models${query}`);
 }
 
-export function runAb(body: AbRequest): Promise<Record<string, unknown>> {
-  return request<Record<string, unknown>>("/api/query-lab/ab", {
+export function getGlossary(): Promise<GlossaryResponse> {
+  return request<GlossaryResponse>("/api/meta/glossary");
+}
+
+export function getQueryLabAnalytics(): Promise<QueryLabAnalyticsResponse> {
+  return request<QueryLabAnalyticsResponse>("/api/query-lab/analytics");
+}
+
+export function runAb(body: AbRequest): Promise<AbResponse> {
+  return request<AbResponse>("/api/query-lab/ab", {
     method: "POST",
     body: JSON.stringify(body)
   });
 }
 
-export function applyProfile(body: ApplyRequest): Promise<Record<string, unknown>> {
-  return request<Record<string, unknown>>("/api/query-lab/apply", {
+export function applyProfile(body: ApplyRequest): Promise<ApplyResponse> {
+  return request<ApplyResponse>("/api/query-lab/apply", {
     method: "POST",
     body: JSON.stringify(body)
   });
+}
+
+export function evaluateQueryResponse(body: QueryLabEvaluateRequest): Promise<EvaluateResponse> {
+  return request<EvaluateResponse>("/api/query-lab/evaluate", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+}
+
+export function getQueryLabTrace(traceId: string): Promise<QueryLabTraceResponse> {
+  return request<QueryLabTraceResponse>(`/api/query-lab/traces/${traceId}`);
 }
