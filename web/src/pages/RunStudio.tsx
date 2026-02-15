@@ -8,6 +8,13 @@ import { createRun, getMetaModels, getRun, subscribeRunEvents } from "../lib/api
 import type { Provider } from "../lib/types";
 import { useStudioStore } from "../store/useStudioStore";
 
+function mean(values: number[]) {
+  if (values.length === 0) {
+    return 0;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 export function RunStudio() {
   const {
     selectedModelId,
@@ -20,7 +27,6 @@ export function RunStudio() {
     pushRunEvent,
     clearRunEvents
   } = useStudioStore();
-
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const modelsQuery = useQuery({
@@ -51,7 +57,6 @@ export function RunStudio() {
     if (!activeRunId) {
       return;
     }
-
     const close = subscribeRunEvents(
       activeRunId,
       (eventType, data) => {
@@ -68,7 +73,6 @@ export function RunStudio() {
         setErrorText("Live stream disconnected. Polling status instead.");
       }
     );
-
     return () => close();
   }, [activeRunId, pushRunEvent, runQuery.data?.status]);
 
@@ -78,20 +82,34 @@ export function RunStudio() {
       if (String(event.eventType ?? "") !== "progress") {
         continue;
       }
-      const stage = String(event.stage ?? "");
-      if (stage === "A" || stage === "B" || stage === "C") {
-        counts[stage] += 1;
-        continue;
-      }
       const stageCounts = event.stage_counts as Record<string, unknown> | undefined;
       if (stageCounts) {
         counts.A = Math.max(counts.A, Number(stageCounts.A ?? counts.A));
         counts.B = Math.max(counts.B, Number(stageCounts.B ?? counts.B));
         counts.C = Math.max(counts.C, Number(stageCounts.C ?? counts.C));
+        continue;
+      }
+      const stage = String(event.stage ?? "");
+      if (stage === "A" || stage === "B" || stage === "C") {
+        counts[stage] += 1;
       }
     }
     return counts;
   }, [runEvents]);
+
+  const latestProgress = useMemo(() => {
+    const progress = runEvents.filter((event) => String(event.eventType ?? "") === "progress");
+    return progress[progress.length - 1] ?? null;
+  }, [runEvents]);
+
+  const activeStage = String(latestProgress?.stage ?? "A");
+  const confidenceScore = useMemo(() => {
+    const reliability = latestProgress?.posterior_reliability as Record<string, unknown> | undefined;
+    if (!reliability) {
+      return 0;
+    }
+    return mean(Object.values(reliability).map((value) => Number(value ?? 0)));
+  }, [latestProgress]);
 
   const providerModelOptions = useMemo(() => {
     const fallback: Record<Provider, string[]> = {
@@ -104,11 +122,7 @@ export function RunStudio() {
       .filter((model) => String(model.provider) === selectedProvider)
       .map((model) => String(model.model_id))
       .filter(Boolean);
-
-    if (fromApi.length > 0) {
-      return fromApi;
-    }
-    return fallback[selectedProvider];
+    return fromApi.length > 0 ? fromApi : fallback[selectedProvider];
   }, [modelsQuery.data?.models, selectedProvider]);
 
   useEffect(() => {
@@ -140,12 +154,12 @@ export function RunStudio() {
   const runSummary = runQuery.data?.summary ?? {};
 
   return (
-    <section className="stack">
+    <section className="stack" data-tour="run-studio">
       <div className="hero-card">
-        <h2>Run Studio</h2>
+        <h2>Profiler Lab</h2>
         <p>
-          Launch adaptive profiling jobs and monitor stage progression, confidence convergence, and budget burn. Early
-          stopping requires confidence + reliability criteria on critical traits.
+          Watch adaptive probing in motion. Each event includes previews of prompt/response and critical trait deltas
+          so you can explain convergence, not just observe it.
         </p>
       </div>
 
@@ -174,7 +188,7 @@ export function RunStudio() {
         {errorText && <p className="hint">{errorText}</p>}
       </form>
 
-      <div className="grid-3">
+      <div className="grid-4">
         <div className="metric-card">
           <h3>Active Run</h3>
           <code>{activeRunId ?? "none"}</code>
@@ -187,22 +201,29 @@ export function RunStudio() {
           <h3>Events</h3>
           <strong>{runEvents.length}</strong>
         </div>
+        <div className="metric-card">
+          <h3>Convergence Confidence</h3>
+          <strong>{confidenceScore.toFixed(3)}</strong>
+        </div>
       </div>
 
-      <div className="grid-3">
-        <div className="metric-card">
-          <h3>Stage A</h3>
-          <strong>{stageSummary.A}</strong>
+      <article className="panel-card">
+        <h3>Stage Animation Rail</h3>
+        <div className="stage-rail">
+          {[
+            { stage: "A", label: "Coverage", count: stageSummary.A },
+            { stage: "B", label: "Refinement", count: stageSummary.B },
+            { stage: "C", label: "Robustness", count: stageSummary.C }
+          ].map((row) => (
+            <div key={row.stage} className={activeStage === row.stage ? "stage-node active" : "stage-node"}>
+              <h4>
+                Stage {row.stage}: {row.label}
+              </h4>
+              <strong>{row.count} probes</strong>
+            </div>
+          ))}
         </div>
-        <div className="metric-card">
-          <h3>Stage B</h3>
-          <strong>{stageSummary.B}</strong>
-        </div>
-        <div className="metric-card">
-          <h3>Stage C</h3>
-          <strong>{stageSummary.C}</strong>
-        </div>
-      </div>
+      </article>
 
       <div className="grid-2">
         <article className="panel-card">
@@ -224,34 +245,34 @@ export function RunStudio() {
         <h3>Run Quality Summary</h3>
         <p>
           {runQuery.data?.status === "completed"
-            ? "Run completed with convergence checks. Use Profile Explorer to inspect trait confidence and risk flags."
-            : "Run is in progress. Convergence quality updates after each adaptive probe."}
+            ? "Run completed with convergence checks. Open Profile Anatomy to inspect full probe evidence."
+            : "Run is active. Each probe event updates confidence, stage routing, and stop-condition readiness."}
         </p>
         <pre>{JSON.stringify(runSummary, null, 2)}</pre>
       </article>
 
       <article className="panel-card">
-        <h3>Run Events</h3>
+        <h3>Explainable Event Stream</h3>
         <div className="event-feed">
           {runEvents
             .slice(-80)
             .reverse()
             .map((event, index) => (
-              <pre key={index}>{JSON.stringify(event, null, 2)}</pre>
+              <article key={index} className="attribution-item">
+                <div className="attribution-head">
+                  <strong>
+                    {String(event.eventType ?? "event")} {typeof event.call_index === "number" ? `#${Number(event.call_index) + 1}` : ""}
+                  </strong>
+                  <span className="tag">{String(event.stage ?? "")}</span>
+                </div>
+                {"prompt_preview" in event && <p className="hint">Prompt: {String(event.prompt_preview ?? "")}</p>}
+                {"response_preview" in event && <p className="hint">Response: {String(event.response_preview ?? "")}</p>}
+                {"critical_delta_preview" in event && (
+                  <pre>{JSON.stringify(event.critical_delta_preview ?? {}, null, 2)}</pre>
+                )}
+              </article>
             ))}
         </div>
-      </article>
-
-      <article className="panel-card">
-        <h3>Model Availability Hints</h3>
-        <ul className="flat-list">
-          {(modelsQuery.data?.models ?? []).map((model, index) => (
-            <li key={index}>
-              <strong>{String(model.model_id)}</strong> <code>{String(model.provider)}</code>
-              <div className="hint">{String(model.available_hint ?? "")}</div>
-            </li>
-          ))}
-        </ul>
       </article>
     </section>
   );

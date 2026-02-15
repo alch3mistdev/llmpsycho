@@ -64,6 +64,14 @@ class ResponseRecord:
     expected_probability: float
     score: float
     score_components: dict[str, float]
+    prompt_text: str | None = None
+    response_text: str | None = None
+    scoring_type: str | None = None
+    trait_loadings: dict[str, float] | None = None
+    item_metadata: dict[str, Any] | None = None
+    posterior_before: dict[str, Any] | None = None
+    posterior_after: dict[str, Any] | None = None
+    selection_context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -152,6 +160,38 @@ class ProfileReport:
     records: list[ResponseRecord]
 
     def to_dict(self) -> dict[str, Any]:
+        record_rows: list[dict[str, Any]] = []
+        for r in self.records:
+            row: dict[str, Any] = {
+                "call_index": r.call_index,
+                "stage": r.stage,
+                "regime_id": r.regime_id,
+                "item_id": r.item_id,
+                "family": r.family,
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "expected_probability": r.expected_probability,
+                "score": r.score,
+                "score_components": r.score_components,
+            }
+            if r.prompt_text is not None:
+                row["prompt_text"] = r.prompt_text
+            if r.response_text is not None:
+                row["response_text"] = r.response_text
+            if r.scoring_type is not None:
+                row["scoring_type"] = r.scoring_type
+            if r.trait_loadings is not None:
+                row["trait_loadings"] = r.trait_loadings
+            if r.item_metadata is not None:
+                row["item_metadata"] = r.item_metadata
+            if r.posterior_before is not None:
+                row["posterior_before"] = r.posterior_before
+            if r.posterior_after is not None:
+                row["posterior_after"] = r.posterior_after
+            if r.selection_context is not None:
+                row["selection_context"] = r.selection_context
+            record_rows.append(row)
+
         return {
             "run_id": self.run_id,
             "model_id": self.model_id,
@@ -179,19 +219,5 @@ class ProfileReport:
                 "tokens_completion": self.budget.completion_tokens,
             },
             "stop_reason": self.stop_reason,
-            "records": [
-                {
-                    "call_index": r.call_index,
-                    "stage": r.stage,
-                    "regime_id": r.regime_id,
-                    "item_id": r.item_id,
-                    "family": r.family,
-                    "prompt_tokens": r.prompt_tokens,
-                    "completion_tokens": r.completion_tokens,
-                    "expected_probability": r.expected_probability,
-                    "score": r.score,
-                    "score_components": r.score_components,
-                }
-                for r in self.records
-            ],
+            "records": record_rows,
         }

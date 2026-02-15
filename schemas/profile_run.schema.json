@@ -130,7 +130,18 @@
             "maximum": 1
           },
           "score": { "type": "number", "minimum": 0, "maximum": 1 },
-          "score_components": { "type": "object" }
+          "score_components": { "type": "object" },
+          "prompt_text": { "type": "string" },
+          "response_text": { "type": "string" },
+          "scoring_type": { "type": "string" },
+          "trait_loadings": {
+            "type": "object",
+            "additionalProperties": { "type": "number" }
+          },
+          "item_metadata": { "type": "object" },
+          "posterior_before": { "type": "object" },
+          "posterior_after": { "type": "object" },
+          "selection_context": { "type": "object" }
         },
         "additionalProperties": true
       }

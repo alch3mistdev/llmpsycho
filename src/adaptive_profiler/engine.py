@@ -166,6 +166,12 @@ class AdaptiveProfilerEngine:
         low_gain_streak = 0
         stop_reason = "item_pool_exhausted"
 
+        def _preview(text: str, *, limit: int = 180) -> str:
+            compact = " ".join(text.split())
+            if len(compact) <= limit:
+                return compact
+            return compact[: max(0, limit - 3)] + "..."
+
         for call_index in range(self.config.call_cap):
             if total_prompt_tokens + total_completion_tokens >= self.config.token_cap:
                 stop_reason = "token_cap_reached"
@@ -194,6 +200,10 @@ class AdaptiveProfilerEngine:
                 break
 
             item = decision.item
+            posterior_before_state = posteriors[regime_id].copy()
+            stage_counts_before = dict(stage_counts)
+            sentinel_count_before = sentinel_count
+            trait_counts_before = dict(trait_counts)
             expected_probability = self.mirt.expected_probability(item, posteriors[regime_id])
 
             t0 = time.perf_counter()
@@ -210,6 +220,15 @@ class AdaptiveProfilerEngine:
                 score, score_components = score_item(item, output.raw_text)
 
             posteriors[regime_id] = self.mirt.update(posteriors[regime_id], item=item, score=score)
+            posterior_after_state = posteriors[regime_id].copy()
+
+            critical_delta_preview = {
+                trait: round(
+                    posterior_after_state.mean[trait] - posterior_before_state.mean[trait],
+                    4,
+                )
+                for trait in self.config.critical_traits
+            }
 
             used_ids.add(item.item_id)
             exposure_counts[item.item_id] += 1
@@ -245,6 +264,37 @@ class AdaptiveProfilerEngine:
                     expected_probability=expected_probability,
                     score=score,
                     score_components=score_components,
+                    prompt_text=item.prompt,
+                    response_text=output.raw_text,
+                    scoring_type=item.scoring_type,
+                    trait_loadings=dict(item.trait_loadings),
+                    item_metadata=dict(item.metadata),
+                    posterior_before={
+                        "mean": {trait: round(value, 6) for trait, value in posterior_before_state.mean.items()},
+                        "variance": {
+                            trait: round(value, 6)
+                            for trait, value in posterior_before_state.variance.items()
+                        },
+                    },
+                    posterior_after={
+                        "mean": {trait: round(value, 6) for trait, value in posterior_after_state.mean.items()},
+                        "variance": {
+                            trait: round(value, 6)
+                            for trait, value in posterior_after_state.variance.items()
+                        },
+                    },
+                    selection_context={
+                        "stage": decision.stage,
+                        "expected_gain": round(decision.expected_gain, 6),
+                        "utility": round(decision.utility, 6),
+                        "epsilon": round(decision.epsilon, 6),
+                        "stage_counts_before": stage_counts_before,
+                        "sentinel_count_before": sentinel_count_before,
+                        "critical_trait_counts_before": {
+                            trait: int(trait_counts_before.get(trait, 0))
+                            for trait in self.config.critical_traits
+                        },
+                    },
                 )
             )
 
@@ -261,9 +311,13 @@ class AdaptiveProfilerEngine:
                     "prompt_tokens": output.prompt_tokens,
                     "completion_tokens": output.completion_tokens,
                     "latency_ms": latency_ms,
+                    "prompt_preview": _preview(item.prompt),
+                    "response_preview": _preview(output.raw_text),
+                    "score_components": score_components,
                     "sentinel_count": sentinel_count,
                     "stage_counts": dict(stage_counts),
                     "stop_reason_preview": stop_reason,
+                    "critical_delta_preview": critical_delta_preview,
                     "posterior_mean": {
                         trait: round(posteriors[regime_id].mean[trait], 4)
                         for trait in self.config.critical_traits

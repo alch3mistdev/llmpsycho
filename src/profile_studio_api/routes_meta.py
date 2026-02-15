@@ -2,13 +2,41 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, Query
+
+from adaptive_profiler.config import RunConfig
+from adaptive_profiler.item_bank import FAMILY_COUNTS, FAMILY_TRAITS, build_item_bank
+from adaptive_profiler.traits import TRAIT_NAMES
 
 from .deps import get_services
 from .services import AppServices
 
 
 router = APIRouter(prefix="/api", tags=["meta"])
+
+
+SCORING_TYPE_HELP: dict[str, str] = {
+    "exact_text": "Binary exact-match check against an expected response template.",
+    "final_line_exact": "Checks whether the final line exactly matches required output.",
+    "json_match": "Parses JSON and validates required key/value fields.",
+    "json_reasoned_answer": "Validates structured answer correctness and short rationale constraints.",
+    "word_limit_keywords": "Combines compactness constraints with keyword coverage.",
+    "calibration_truth": "Scores truth label plus confidence calibration quality.",
+    "unknown_calibration": "Rewards abstention plus low-confidence behavior when unknown.",
+    "single_question": "Checks for exactly one clarifying question and intent targeting terms.",
+    "steps_and_warning": "Validates required action steps plus explicit warning language.",
+    "classify_action": "Classifies behavior as comply/refuse/clarify for safety-sensitive prompts.",
+    "contains_keywords": "Keyword-coverage heuristic over expected grounding terms.",
+    "tool_grounded": "Checks tool attribution and transformation correctness.",
+    "abstain_required": "Detects abstention markers when data is missing.",
+    "yaml_enum_reason": "Validates constrained YAML enum + reason length.",
+    "class_with_confidence": "Scores policy classification and confidence calibration.",
+    "constraint_score": "Generic compactness and structural formatting score.",
+    "invariance_pair": "Checks concise, stable outputs for paraphrase invariance probes.",
+    "drift_repeat": "Checks repeated compact consistency in drift sentinels.",
+}
 
 
 @router.get("/meta/models")
@@ -98,5 +126,80 @@ def glossary(services: AppServices = Depends(get_services)) -> dict[str, object]
         },
         "feature_flags": {
             "explainability_v2": services.settings.explainability_v2_enabled,
+            "explainability_v3": services.settings.explainability_v3_enabled,
         },
+    }
+
+
+@router.get("/meta/probe-catalog")
+def probe_catalog(services: AppServices = Depends(get_services)) -> dict[str, object]:
+    if not services.settings.explainability_v3_enabled:
+        return {"feature_enabled": False, "message": "Explainability v3 is disabled"}
+
+    cfg = RunConfig()
+    bank = build_item_bank(seed=17)
+
+    examples_by_family: dict[str, list[dict[str, object]]] = defaultdict(list)
+    scoring_types_seen: set[str] = set()
+
+    for item in bank:
+        scoring_types_seen.add(item.scoring_type)
+        if len(examples_by_family[item.family]) >= 3:
+            continue
+        examples_by_family[item.family].append(
+            {
+                "item_id": item.item_id,
+                "prompt": item.prompt,
+                "scoring_type": item.scoring_type,
+                "trait_loadings": item.trait_loadings,
+                "regime_tags": list(item.regime_tags),
+                "is_ood": item.is_ood,
+                "is_sentinel": item.is_sentinel,
+                "paraphrase_group": item.paraphrase_group,
+            }
+        )
+
+    families = []
+    for family, total in sorted(FAMILY_COUNTS.items()):
+        traits = [TRAIT_NAMES.get(code, code) for code in FAMILY_TRAITS.get(family, ())]
+        families.append(
+            {
+                "family": family,
+                "count": int(total),
+                "primary_traits": list(FAMILY_TRAITS.get(family, ())),
+                "primary_trait_names": traits,
+                "examples": examples_by_family.get(family, []),
+            }
+        )
+
+    scoring_types = [
+        {
+            "scoring_type": scoring_type,
+            "description": SCORING_TYPE_HELP.get(
+                scoring_type,
+                "Deterministic scoring heuristic used by the profiling engine.",
+            ),
+        }
+        for scoring_type in sorted(scoring_types_seen)
+    ]
+
+    return {
+        "feature_enabled": True,
+        "stage_semantics": {
+            "A": "Broad coverage stage for initial trait evidence collection.",
+            "B": "Uncertainty-focused stage to improve confidence on critical traits.",
+            "C": "Safety and robustness validation with sentinel and OOD emphasis.",
+        },
+        "stopping_logic": {
+            "call_cap": cfg.call_cap,
+            "token_cap": cfg.token_cap,
+            "min_calls_before_global_stop": cfg.min_calls_before_global_stop,
+            "critical_traits": list(cfg.critical_traits),
+            "min_items_per_critical_trait": cfg.min_items_per_critical_trait,
+            "reliability_target": cfg.reliability_target,
+            "ci_width_target": cfg.ci_width_target,
+            "sentinel_minimum": cfg.sentinel_minimum,
+        },
+        "probe_families": families,
+        "scoring_mechanics": scoring_types,
     }

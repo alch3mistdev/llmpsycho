@@ -43,9 +43,9 @@ export function IngestionCenter() {
   };
 
   return (
-    <section className="stack">
+    <section className="stack" data-tour="artifact-intake">
       <div className="hero-card">
-        <h2>Ingestion Center</h2>
+        <h2>Artifact Intake</h2>
         <p>Monitor watched folder sync, trigger manual scans, and upload profile JSON files directly.</p>
       </div>
 

@@ -17,6 +17,8 @@ class SelectionDecision:
     item: Item
     expected_gain: float
     stage: str
+    utility: float = 0.0
+    epsilon: float = 0.0
 
 
 class AdaptiveSelector:
@@ -160,4 +162,10 @@ class AdaptiveSelector:
         else:
             selected = top[0]
 
-        return SelectionDecision(item=selected[2], expected_gain=selected[1], stage=stage)
+        return SelectionDecision(
+            item=selected[2],
+            expected_gain=selected[1],
+            stage=stage,
+            utility=selected[0],
+            epsilon=epsilon,
+        )

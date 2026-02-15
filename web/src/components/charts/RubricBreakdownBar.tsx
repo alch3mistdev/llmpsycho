@@ -13,6 +13,8 @@ export function RubricBreakdownBar({ baseline, treated }: RubricBreakdownBarProp
   const baselineScores = baseline ? baseline.rubric_scores.map((row) => Number(row.merged_score.toFixed(3))) : [];
 
   const option = {
+    animationDuration: 300,
+    animationDurationUpdate: 260,
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     legend: {
       data: baseline ? ["Baseline", "Treated"] : ["Score"]
@@ -34,13 +36,15 @@ export function RubricBreakdownBar({ baseline, treated }: RubricBreakdownBarProp
             name: "Baseline",
             type: "bar",
             data: baselineScores,
-            itemStyle: { color: "#64748b" }
+            itemStyle: { color: "#64748b" },
+            universalTransition: true
           },
           {
             name: "Treated",
             type: "bar",
             data: treatedScores,
-            itemStyle: { color: "#0ea5a6" }
+            itemStyle: { color: "#0ea5a6" },
+            universalTransition: true
           }
         ]
       : [
@@ -48,7 +52,8 @@ export function RubricBreakdownBar({ baseline, treated }: RubricBreakdownBarProp
             name: "Score",
             type: "bar",
             data: treatedScores,
-            itemStyle: { color: "#0ea5a6" }
+            itemStyle: { color: "#0ea5a6" },
+            universalTransition: true
           }
         ]
   };

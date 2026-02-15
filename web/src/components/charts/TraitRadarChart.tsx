@@ -17,6 +17,8 @@ export function TraitRadarChart({ title, traits }: TraitRadarChartProps) {
   const values = traits.slice(0, 12).map((item) => Number(item.mean.toFixed(3)));
 
   const option = {
+    animationDuration: 340,
+    animationDurationUpdate: 300,
     backgroundColor: "transparent",
     title: {
       text: title,
@@ -52,6 +54,7 @@ export function TraitRadarChart({ title, traits }: TraitRadarChartProps) {
     series: [
       {
         type: "radar",
+        universalTransition: true,
         data: [
           {
             value: values,

@@ -26,6 +26,8 @@ export function CausalFlowGraph({ trace }: CausalFlowGraphProps) {
   ];
 
   const option = {
+    animationDuration: 360,
+    animationDurationUpdate: 320,
     tooltip: { trigger: "item" },
     series: [
       {
@@ -44,7 +46,8 @@ export function CausalFlowGraph({ trace }: CausalFlowGraphProps) {
         label: {
           color: "#0f172a",
           fontSize: 12
-        }
+        },
+        universalTransition: true
       }
     ]
   };

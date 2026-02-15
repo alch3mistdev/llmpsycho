@@ -10,6 +10,8 @@ export function RegimeDeltaDumbbellChart({ rows }: RegimeDeltaDumbbellChartProps
   const top = rows.slice(0, 12).reverse();
 
   const option = {
+    animationDuration: 320,
+    animationDurationUpdate: 280,
     tooltip: { trigger: "axis" },
     grid: { left: 120, right: 30, top: 20, bottom: 40 },
     xAxis: {
@@ -31,7 +33,8 @@ export function RegimeDeltaDumbbellChart({ rows }: RegimeDeltaDumbbellChartProps
         showSymbol: true,
         symbolSize: 8,
         itemStyle: { color: "#0284c7" },
-        name: "Core"
+        name: "Core",
+        universalTransition: true
       },
       {
         type: "line",
@@ -40,7 +43,8 @@ export function RegimeDeltaDumbbellChart({ rows }: RegimeDeltaDumbbellChartProps
         showSymbol: true,
         symbolSize: 8,
         itemStyle: { color: "#ea580c" },
-        name: "Safety"
+        name: "Safety",
+        universalTransition: true
       },
       {
         type: "custom",

@@ -60,4 +60,5 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-data/
+/data/profile_store*
+/data/profiles*

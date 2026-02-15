@@ -56,12 +56,11 @@ export function Dashboard() {
   const topRule = analyticsQuery.data?.effective_interventions?.[0];
 
   return (
-    <section className="stack">
+    <section className="stack" data-tour="mission-control">
       <div className="hero-card">
-        <h2>Profile Landscape</h2>
+        <h2>Mission Control</h2>
         <p>
-          Monitor profiling health, intervention impact, and model coverage. Use this view to quickly spot alignment
-          gains and where interventions are most effective.
+          Monitor profiling health, intervention impact, and model coverage. This is the highest-level cockpit view.
         </p>
       </div>
 

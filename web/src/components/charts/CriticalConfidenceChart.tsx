@@ -21,6 +21,8 @@ export function CriticalConfidenceChart({ events }: CriticalConfidenceChartProps
   const traits = Array.from(traitSet).sort();
 
   const option = {
+    animationDuration: 300,
+    animationDurationUpdate: 260,
     tooltip: { trigger: "axis" },
     legend: { data: traits, bottom: 0 },
     xAxis: {
@@ -39,6 +41,7 @@ export function CriticalConfidenceChart({ events }: CriticalConfidenceChartProps
       type: "line",
       smooth: true,
       showSymbol: false,
+      universalTransition: true,
       data: progressEvents.map((event) => {
         const reliability = event.posterior_reliability as Record<string, unknown> | undefined;
         return Number(reliability?.[trait] ?? 0);

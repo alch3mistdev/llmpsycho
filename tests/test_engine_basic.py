@@ -25,6 +25,23 @@ class EngineBasicBehaviorTest(unittest.TestCase):
         self.assertGreaterEqual(int(report.diagnostics["calls_in_stage_b"]), cfg.stage_b_min)
         self.assertGreaterEqual(int(report.diagnostics["calls_in_stage_c"]), cfg.stage_c_min)
 
+    def test_records_include_enriched_trace_fields(self) -> None:
+        cfg = RunConfig(model_id="trace-test")
+        engine = AdaptiveProfilerEngine(config=cfg, item_bank=build_item_bank(seed=17), seed=44)
+        adapter = SimulatedModelAdapter(true_theta_by_regime=sample_true_thetas(seed=45), seed=46)
+
+        report = engine.run(adapter, run_id="trace-run")
+        self.assertGreater(len(report.records), 0)
+        first = report.records[0]
+        self.assertIsNotNone(first.prompt_text)
+        self.assertIsNotNone(first.response_text)
+        self.assertIsNotNone(first.scoring_type)
+        self.assertIsNotNone(first.trait_loadings)
+        self.assertIsNotNone(first.item_metadata)
+        self.assertIsNotNone(first.posterior_before)
+        self.assertIsNotNone(first.posterior_after)
+        self.assertIsNotNone(first.selection_context)
+
 
 if __name__ == "__main__":
     unittest.main()

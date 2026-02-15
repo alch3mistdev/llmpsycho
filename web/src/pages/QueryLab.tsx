@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { AttributionList } from "../components/AttributionList";
 import { ConfidenceBadge } from "../components/ConfidenceBadge";
 import { EvidenceDrawer } from "../components/EvidenceDrawer";
+import { InfoTooltip } from "../components/InfoTooltip";
 import { MetricDefinitionPopover } from "../components/MetricDefinitionPopover";
 import { PlainLanguageCard } from "../components/PlainLanguageCard";
 import { CausalFlowGraph } from "../components/charts/CausalFlowGraph";
@@ -31,7 +32,7 @@ export function QueryLab() {
     explanationMode
   } = useStudioStore();
 
-  const [queryText, setQueryText] = useState("Summarize the likely causes of elevated API latency and suggest next checks.");
+  const [queryText, setQueryText] = useState("Summarize likely causes of elevated API latency and suggest next checks.");
   const [regimeId, setRegimeId] = useState("core");
   const [disabledRules, setDisabledRules] = useState<string[]>([]);
 
@@ -39,23 +40,15 @@ export function QueryLab() {
     queryKey: ["profiles", "query-lab"],
     queryFn: () => listProfiles({ limit: 300 })
   });
-
   const glossaryQuery = useQuery({
     queryKey: ["meta", "glossary"],
     queryFn: getGlossary
   });
-
-  const abMutation = useMutation({
-    mutationFn: runAb
-  });
-
-  const applyMutation = useMutation({
-    mutationFn: applyProfile
-  });
+  const abMutation = useMutation({ mutationFn: runAb });
+  const applyMutation = useMutation({ mutationFn: applyProfile });
 
   const abData = abMutation.data as AbResponse | undefined;
   const applyData = applyMutation.data as ApplyResponse | undefined;
-
   const treatedAlignment = abData?.alignment_report?.treated ?? applyData?.alignment_report;
   const baselineAlignment = abData?.alignment_report?.baseline;
 
@@ -75,7 +68,6 @@ export function QueryLab() {
     if (!selectedProfileId) {
       return;
     }
-
     abMutation.mutate({
       profile_id: selectedProfileId,
       provider: selectedProvider,
@@ -105,13 +97,40 @@ export function QueryLab() {
     setDisabledRules((current) => (current.includes(rule) ? current.filter((value) => value !== rule) : [...current, rule]));
   };
 
+  const causalSteps = [
+    {
+      title: "1. Query Intent",
+      body: queryText
+    },
+    {
+      title: "2. Profile Evidence",
+      body: selectedProfileId ? `Using profile ${selectedProfileId} (${regimeId})` : "Select a profile to continue."
+    },
+    {
+      title: "3. Rule Triggers",
+      body: (abData?.intervention_plan?.rules_applied ?? applyData?.intervention_plan?.rules_applied ?? []).join(", ") || "No rules yet."
+    },
+    {
+      title: "4. Transformations",
+      body:
+        (abData?.intervention_plan?.system_addendum ?? applyData?.intervention_plan?.system_addendum ?? "No system addendum yet.") ||
+        "No transform."
+    },
+    {
+      title: "5. Result Deltas",
+      body: abData
+        ? `intent ${abData.diff.intent_delta.toFixed(3)}, safety ${abData.diff.safety_delta.toFixed(3)}, token ${abData.diff.token_delta}`
+        : "Run A/B to produce deltas."
+    }
+  ];
+
   return (
-    <section className="stack">
+    <section className="stack" data-tour="query-lab">
       <div className="hero-card">
-        <h2>Query Lab</h2>
+        <h2>Intervention Simulator</h2>
         <p>
-          Compare baseline vs profile-applied behavior through an explainable pipeline: intent decomposition, profile
-          evidence, rule triggers, transforms, and outcome deltas.
+          Step through intent, profile evidence, rules, and output deltas. Use counterfactual toggles to understand
+          what each rule contributes.
         </p>
       </div>
 
@@ -124,7 +143,7 @@ export function QueryLab() {
               <option value="">Select profile</option>
               {(profilesQuery.data?.profiles ?? []).map((profile) => (
                 <option key={profile.profile_id} value={profile.profile_id}>
-                  {profile.profile_id} · {profile.model_id} · {profile.provider}
+                  {profile.profile_id} - {profile.model_id} - {profile.provider}
                 </option>
               ))}
             </select>
@@ -172,6 +191,16 @@ export function QueryLab() {
             </button>
           </div>
 
+          <InfoTooltip
+            id="overall-delta"
+            title="Overall Alignment Delta"
+            definition="Difference between treated and baseline overall alignment scores."
+            whyItMatters="Positive deltas imply intervention improved response quality."
+            decisionImplication="Sustained negative deltas indicate over-constraining rules."
+          >
+            <span className="tag">Metric help</span>
+          </InfoTooltip>
+
           {abData && (
             <PlainLanguageCard title="Verdict" summary={verdict}>
               <p className="hint">Overall alignment delta: {abData.alignment_report.delta.overall_delta.toFixed(3)}</p>
@@ -181,15 +210,28 @@ export function QueryLab() {
 
         <div className="stack">
           <article className="panel-card">
-            <h3>Causal Pipeline</h3>
-            {(abData?.causal_trace || applyData?.causal_trace) && (
-              <CausalFlowGraph trace={(abData?.causal_trace ?? applyData?.causal_trace)!} />
-            )}
-            {!(abData?.causal_trace || applyData?.causal_trace) && <p className="hint">Run Query Lab to generate trace.</p>}
+            <h3>Causal Stepper</h3>
+            <div className="stepper">
+              {causalSteps.map((step) => (
+                <div key={step.title} className="stepper-row">
+                  <strong>{step.title}</strong>
+                  <p className="hint">{step.body}</p>
+                </div>
+              ))}
+            </div>
           </article>
 
           <article className="panel-card">
-            <h3>Intent Alignment Score</h3>
+            <h3>Causal Flow</h3>
+            {(abData?.causal_trace || applyData?.causal_trace) ? (
+              <CausalFlowGraph trace={(abData?.causal_trace ?? applyData?.causal_trace)!} />
+            ) : (
+              <p className="hint">Run Query Lab to generate trace.</p>
+            )}
+          </article>
+
+          <article className="panel-card">
+            <h3>Alignment Confidence</h3>
             {!treatedAlignment && <p className="hint">No alignment report yet.</p>}
             {treatedAlignment && (
               <>
@@ -216,20 +258,6 @@ export function QueryLab() {
           </article>
 
           {treatedAlignment && <RubricBreakdownBar baseline={baselineAlignment} treated={treatedAlignment} />}
-
-          <article className="panel-card">
-            <h3>Top Contributors</h3>
-            <AttributionList rows={(abData?.attribution ?? applyData?.causal_trace?.attribution ?? []).slice(0, 8)} />
-          </article>
-
-          <article className="panel-card">
-            <h3>Metrics Glossary</h3>
-            <div className="glossary-grid">
-              {Object.entries(glossaryQuery.data?.metrics ?? {}).map(([term, definition]) => (
-                <MetricDefinitionPopover key={term} term={term} definition={definition} />
-              ))}
-            </div>
-          </article>
         </div>
       </div>
 
@@ -259,6 +287,11 @@ export function QueryLab() {
       </div>
 
       <article className="panel-card">
+        <h3>Rule Attribution</h3>
+        <AttributionList rows={(abData?.attribution ?? applyData?.causal_trace?.attribution ?? []).slice(0, 8)} />
+      </article>
+
+      <article className="panel-card">
         <h3>Intervention Plan + Deltas</h3>
         <div className="grid-2">
           <pre>{JSON.stringify(abData?.intervention_plan ?? applyData?.intervention_plan ?? {}, null, 2)}</pre>
@@ -269,6 +302,15 @@ export function QueryLab() {
           traceId={abData?.evaluation_trace_ids?.intervention ?? applyData?.intervention_trace_id}
           fallback={(abData?.causal_trace ?? applyData?.causal_trace) as unknown as Record<string, unknown>}
         />
+      </article>
+
+      <article className="panel-card">
+        <h3>Metrics Glossary</h3>
+        <div className="glossary-grid">
+          {Object.entries(glossaryQuery.data?.metrics ?? {}).map(([term, definition]) => (
+            <MetricDefinitionPopover key={term} term={term} definition={definition} />
+          ))}
+        </div>
       </article>
 
       {explanationMode === "Technical" && (

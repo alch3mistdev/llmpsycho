@@ -20,6 +20,8 @@ export function BudgetBurnChart({ events }: BudgetBurnChartProps) {
   });
 
   const option = {
+    animationDuration: 320,
+    animationDurationUpdate: 280,
     tooltip: { trigger: "axis" },
     legend: {
       data: ["Prompt", "Completion", "Total"],
@@ -41,20 +43,23 @@ export function BudgetBurnChart({ events }: BudgetBurnChartProps) {
         name: "Prompt",
         type: "line",
         data: series.map((x) => x.prompt),
-        lineStyle: { color: "#0284c7" }
+        lineStyle: { color: "#0284c7" },
+        universalTransition: true
       },
       {
         name: "Completion",
         type: "line",
         data: series.map((x) => x.completion),
-        lineStyle: { color: "#eab308" }
+        lineStyle: { color: "#eab308" },
+        universalTransition: true
       },
       {
         name: "Total",
         type: "line",
         data: series.map((x) => x.total),
         lineStyle: { color: "#ea580c", width: 3 },
-        areaStyle: { color: "rgba(234,88,12,0.16)" }
+        areaStyle: { color: "rgba(234,88,12,0.16)" },
+        universalTransition: true
       }
     ]
   };

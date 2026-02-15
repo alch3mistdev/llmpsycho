@@ -7,6 +7,8 @@ import type {
   GlossaryResponse,
   IngestionStatus,
   MetaModelsResponse,
+  ProbeCatalog,
+  ProfileProbeTraceResponse,
   ProfileDetail,
   ProfileExplainResponse,
   ProfileIndex,
@@ -131,6 +133,42 @@ export function getProfileExplain(profileId: string, regimeId = "core"): Promise
   return request<ProfileExplainResponse>(`/api/profiles/${profileId}/explain?regime_id=${encodeURIComponent(regimeId)}`);
 }
 
+export function getProfileProbeTrace(
+  profileId: string,
+  params?: {
+    regime_id?: string;
+    stage?: string;
+    family?: string;
+    q?: string;
+    offset?: number;
+    limit?: number;
+  }
+): Promise<ProfileProbeTraceResponse> {
+  const query = new URLSearchParams();
+  if (params?.regime_id) {
+    query.set("regime_id", params.regime_id);
+  }
+  if (params?.stage) {
+    query.set("stage", params.stage);
+  }
+  if (params?.family) {
+    query.set("family", params.family);
+  }
+  if (params?.q) {
+    query.set("q", params.q);
+  }
+  if (typeof params?.offset === "number") {
+    query.set("offset", String(params.offset));
+  }
+  if (typeof params?.limit === "number") {
+    query.set("limit", String(params.limit));
+  }
+  const suffix = query.toString();
+  return request<ProfileProbeTraceResponse>(
+    `/api/profiles/${profileId}/probe-trace${suffix ? `?${suffix}` : ""}`
+  );
+}
+
 export async function importProfile(file: File): Promise<{ profile_id: string; status: string; source: string }> {
   const form = new FormData();
   form.append("file", file);
@@ -162,6 +200,10 @@ export function getMetaModels(forceRefresh = false): Promise<MetaModelsResponse>
 
 export function getGlossary(): Promise<GlossaryResponse> {
   return request<GlossaryResponse>("/api/meta/glossary");
+}
+
+export function getProbeCatalog(): Promise<ProbeCatalog> {
+  return request<ProbeCatalog>("/api/meta/probe-catalog");
 }
 
 export function getQueryLabAnalytics(): Promise<QueryLabAnalyticsResponse> {

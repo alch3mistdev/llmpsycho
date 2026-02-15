@@ -108,6 +108,7 @@ export interface ProfileDetail {
   regime_deltas?: RegimeDelta[];
   trait_driver_map?: TraitDriver[];
   explainability_version?: number;
+  trace_summary?: TraceSummary | null;
 }
 
 export interface ProfileExplainResponse {
@@ -336,5 +337,85 @@ export interface GlossaryResponse {
   confidence_labels: Record<string, string>;
   feature_flags: {
     explainability_v2: boolean;
+    explainability_v3?: boolean;
   };
+}
+
+export interface ProbeTraceRow {
+  call_index: number;
+  stage: string;
+  regime_id: string;
+  item_id: string;
+  family: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  expected_probability: number;
+  score: number;
+  score_components: Record<string, number>;
+  prompt_text?: string;
+  response_text?: string;
+  scoring_type?: string;
+  trait_loadings?: Record<string, number>;
+  item_metadata?: Record<string, unknown>;
+  posterior_before?: Record<string, unknown>;
+  posterior_after?: Record<string, unknown>;
+  selection_context?: Record<string, unknown>;
+  has_full_transcript?: boolean;
+}
+
+export interface ProfileProbeTraceResponse {
+  profile_id: string;
+  count: number;
+  total: number;
+  offset: number;
+  limit: number;
+  partial_trace: boolean;
+  items: ProbeTraceRow[];
+}
+
+export interface ProbeCatalogFamily {
+  family: string;
+  count: number;
+  primary_traits: string[];
+  primary_trait_names: string[];
+  examples: Array<{
+    item_id: string;
+    prompt: string;
+    scoring_type: string;
+    trait_loadings: Record<string, number>;
+    regime_tags: string[];
+    is_ood: boolean;
+    is_sentinel: boolean;
+    paraphrase_group?: string | null;
+  }>;
+}
+
+export interface ProbeCatalog {
+  feature_enabled: boolean;
+  message?: string;
+  stage_semantics?: Record<string, string>;
+  stopping_logic?: Record<string, unknown>;
+  probe_families?: ProbeCatalogFamily[];
+  scoring_mechanics?: Array<{ scoring_type: string; description: string }>;
+}
+
+export interface TraceSummary {
+  total_records: number;
+  records_with_full_transcript: number;
+  records_with_enriched_fields: number;
+  partial_trace: boolean;
+  stage_counts: Record<string, number>;
+  top_families: Array<{ family: string; count: number }>;
+}
+
+export interface TourState {
+  never_show_auto: boolean;
+  last_step: number;
+  completed_at?: string | null;
+}
+
+export interface PinnedTooltip {
+  id: string;
+  title: string;
+  content: string;
 }
