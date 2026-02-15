@@ -1,49 +1,120 @@
 # llmpsycho
 
-Convergence-first adaptive psychometric profiling for LLMs over chat-completions APIs, plus an interactive Profile Studio and Query Lab.
+Adaptive psychometric profiling for LLMs, plus a local **Profile Studio** for creating, ingesting, exploring, and applying profiles with A/B intervention testing.
 
-## Core profiling engine
+## What This Project Does
 
-Implemented in `src/adaptive_profiler`:
+`llmpsycho` helps you measure an LLM as a latent trait profile (capability + alignment behavior), then operationalize that profile in an interactive UX.
 
-- 12-trait latent profile (`T1..T12`) across capability + alignment behavior.
-- Multidimensional 2PL-style Bayesian updater.
-- Adaptive selection with coverage + sentinel/OOD robustness controls.
-- Convergence-first defaults:
-  - `call_cap=60`
-  - `token_cap=14000`
-  - `min_calls_before_global_stop=40`
-  - `min_items_per_critical_trait=6`
-  - critical traits: `T4,T5,T8,T9,T10`
-- Two-regime operation (`core`, `safety`) and JSON schema output.
+Core outcomes:
 
-## Profile Studio (FastAPI + React)
+- Estimate a 12-trait vector under adaptive probing with convergence-focused stopping.
+- Persist and compare profiles across runs, regimes, and imported artifacts.
+- Apply rule-based profile interventions to real queries.
+- Run same-model A/B (`profile off` vs `profile on`) to measure safety/intent/cost tradeoffs.
 
-Profile Studio provides:
+## Project Components
 
-- Profile run creation with live event stream (`SSE`) telemetry.
-- Profile history explorer with detailed trait/risk views.
-- Ingestion center with watched-folder sync and manual file import.
-- Query Lab with same-model A/B intervention (`profile off` vs `profile on`).
+### 1) Profiling Engine (`src/adaptive_profiler`)
 
-### Backend API
+- Multidimensional 2PL-style online updater.
+- Adaptive item selection + uncertainty-driven stopping.
+- Two-regime operation (`core`, `safety`).
+- Robustness diagnostics (OOD/paraphrase/drift/overfit signals).
 
-Code: `src/profile_studio_api`
+Default convergence-focused settings:
 
-Run locally:
+- `call_cap=60`
+- `token_cap=14000`
+- `min_calls_before_global_stop=40`
+- `min_items_per_critical_trait=6`
+- critical traits: `T4,T5,T8,T9,T10`
+
+### 2) Backend API (`src/profile_studio_api`)
+
+- FastAPI app with SQLite repository + JSON artifact store.
+- Async run jobs with live SSE stream for Run Studio telemetry.
+- Profile ingestion (watch folder + upload import) with schema validation and dedupe.
+- Query Lab endpoints for apply-only and same-model A/B.
+- Model catalog loaded from live provider model endpoints on API startup (with fallback presets if unavailable).
+
+### 3) Frontend UX (`web`)
+
+React + TypeScript + Vite app with:
+
+- **Dashboard**: health/risk/history snapshots.
+- **Run Studio**: launch runs, watch stage timeline + budget burn + event feed.
+- **Profile Explorer**: inspect traits, confidence, diagnostics, risk flags.
+- **Ingestion Center**: watch-folder status, scan, upload, error visibility.
+- **Query Lab**: intervention plan preview, side-by-side A/B outputs and metric deltas.
+
+## Repository Layout
+
+```text
+src/adaptive_profiler/        # profiling engine
+src/profile_studio_api/       # FastAPI backend
+web/                          # React frontend
+schemas/profile_run.schema.json
+docs/                          # product + interpretation + operations docs
+data/                          # sqlite + artifacts + ingestion folders
+examples/                      # runnable examples
+tests/                         # unit/integration tests
+```
+
+## Requirements
+
+- Python `>=3.11`
+- Node.js `>=18` (for frontend)
+
+## Installation
+
+### Python package (editable)
+
+```bash
+pip install -e .
+```
+
+Optional extras:
+
+```bash
+# Studio backend deps (FastAPI, uvicorn, multipart, jsonschema)
+pip install -e ".[studio]"
+
+# Provider SDKs
+pip install -e ".[openai]"
+pip install -e ".[anthropic]"
+
+# Everything
+pip install -e ".[all]"
+```
+
+Provider keys (for real model calls):
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+## Quick Start
+
+### A) Engine only (simulated)
+
+```bash
+PYTHONPATH=src python3 examples/hypothetical_run.py
+```
+
+### B) Full local product (API + UI)
+
+1. Start API:
 
 ```bash
 pip install -e ".[studio]"
 uvicorn profile_studio_api.main:app --reload
 ```
 
-Default API URL: `http://localhost:8000`
+API base: `http://localhost:8000`
 
-### Frontend UX
-
-Code: `web/`
-
-Run locally:
+2. Start frontend:
 
 ```bash
 cd web
@@ -51,22 +122,29 @@ npm install
 npm run dev
 ```
 
-Default UI URL: `http://localhost:5173`
+UI: `http://localhost:5173`
 
-## Data directories
+Frontend can target another API host with:
 
-Created automatically by backend startup:
+```bash
+VITE_API_BASE=http://localhost:8000 npm run dev
+```
 
-- `data/profile_store.sqlite`: SQLite index/history store.
-- `data/profiles/*.json`: canonical profile artifacts.
-- `data/ingestion/`: watched ingestion folder.
-- `data/quarantine/`: invalid ingestion payload copies.
+## Data and Persistence
 
-## API surface
+Created/used by backend startup:
 
+- `data/profile_store.sqlite` (index/history/events)
+- `data/profiles/*.json` (canonical artifacts)
+- `data/ingestion/` (watched import folder)
+- `data/quarantine/` (invalid ingestion payload snapshots)
+
+## API Overview
+
+- `GET /api/health`
 - `POST /api/runs`
 - `GET /api/runs/{run_id}`
-- `GET /api/runs/{run_id}/events`
+- `GET /api/runs/{run_id}/events` (SSE)
 - `GET /api/profiles`
 - `GET /api/profiles/{profile_id}`
 - `POST /api/profiles/import`
@@ -76,44 +154,39 @@ Created automatically by backend startup:
 - `POST /api/query-lab/apply`
 - `GET /api/meta/models`
 
-## Provider setup (real model calls)
+## Model Catalog Behavior
 
-Install optional provider dependencies:
+On API startup, `/api/meta/models` is populated by querying provider model endpoints when keys/SDKs are available.
 
-```bash
-pip install -e ".[openai]"
-pip install -e ".[anthropic]"
-# or both + studio
-pip install -e ".[all]"
-```
+- OpenAI: `models.list()`
+- Anthropic: `models.list()` (if supported by installed SDK)
 
-Set API keys:
+If live fetch fails (missing key, SDK issue, endpoint error), fallback presets are returned with error metadata.
 
-```bash
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
+## Testing
 
-## Quick checks
-
-Run tests:
+Run backend/engine tests:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-Run simulated profile example:
+Note: API integration tests requiring FastAPI are skipped if `fastapi` is not installed.
 
-```bash
-PYTHONPATH=src python3 examples/hypothetical_run.py
-```
+## Documentation
 
-## Documentation map
-
-- `docs/convergence_first_budget_update.md`
 - `docs/profile_studio_overview.md`
 - `docs/profile_interpretation_guide.md`
 - `docs/query_lab_ab_guide.md`
 - `docs/use_cases_routing_and_alignment.md`
 - `docs/operations_ingestion_and_history.md`
 - `docs/examples_end_to_end_workflows.md`
+- `docs/convergence_first_budget_update.md`
+
+## Typical Workflows
+
+1. Create a new profile in Run Studio and watch convergence live.
+2. Explore the resulting profile in Profile Explorer.
+3. Import external profiles via ingestion folder/upload.
+4. Use Query Lab to compare baseline vs profile-applied behavior.
+5. Use measured deltas to tune routing/intervention policy.
