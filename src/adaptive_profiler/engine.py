@@ -140,7 +140,7 @@ class AdaptiveProfilerEngine:
             )
         return RegimeReport(regime_id=regime_id, traits=estimates)
 
-    def run(self, model_adapter, run_id: str | None = None) -> ProfileReport:
+    def run(self, model_adapter, run_id: str | None = None, progress_callback=None) -> ProfileReport:
         """
         Execute an adaptive profiling run.
 
@@ -247,6 +247,33 @@ class AdaptiveProfilerEngine:
                     score_components=score_components,
                 )
             )
+
+            if progress_callback is not None:
+                progress_event = {
+                    "run_id": run_id,
+                    "call_index": call_index,
+                    "stage": stage,
+                    "regime_id": regime_id,
+                    "item_id": item.item_id,
+                    "family": item.family,
+                    "score": score,
+                    "expected_probability": expected_probability,
+                    "prompt_tokens": output.prompt_tokens,
+                    "completion_tokens": output.completion_tokens,
+                    "latency_ms": latency_ms,
+                    "sentinel_count": sentinel_count,
+                    "stage_counts": dict(stage_counts),
+                    "stop_reason_preview": stop_reason,
+                    "posterior_mean": {
+                        trait: round(posteriors[regime_id].mean[trait], 4)
+                        for trait in self.config.critical_traits
+                    },
+                    "posterior_reliability": {
+                        trait: round(posteriors[regime_id].reliability(trait), 4)
+                        for trait in self.config.critical_traits
+                    },
+                }
+                progress_callback(progress_event)
 
             should_stop, reason = self._should_stop(
                 total_calls=len(records),

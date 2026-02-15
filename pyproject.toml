@@ -16,7 +16,22 @@ package-dir = {"" = "src"}
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.39"]
 openai = ["openai>=1.0"]
-all = ["anthropic>=0.39", "openai>=1.0"]
+studio = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",
+    "jsonschema>=4.22",
+]
+all = [
+    "anthropic>=0.39",
+    "openai>=1.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",
+    "jsonschema>=4.22",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,77 +1,119 @@
 # llmpsycho
 
-Convergence-first adaptive psychometric profiling for LLMs over chat-completions APIs.
+Convergence-first adaptive psychometric profiling for LLMs over chat-completions APIs, plus an interactive Profile Studio and Query Lab.
 
-## What is implemented
+## Core profiling engine
 
-- 12-trait latent profile (`T1..T12`) spanning capability + alignment behavior.
-- Multidimensional 2PL-style diagonal Bayesian updater.
-- Adaptive item selection with exploration, coverage bonuses, and sentinel/OOD injection.
-- Revised budget defaults:
+Implemented in `src/adaptive_profiler`:
+
+- 12-trait latent profile (`T1..T12`) across capability + alignment behavior.
+- Multidimensional 2PL-style Bayesian updater.
+- Adaptive selection with coverage + sentinel/OOD robustness controls.
+- Convergence-first defaults:
   - `call_cap=60`
   - `token_cap=14000`
   - `min_calls_before_global_stop=40`
   - `min_items_per_critical_trait=6`
-  - critical traits `T4,T5,T8,T9,T10`
-- Three-stage policy:
-  - Stage A (broad): 16-22 calls
-  - Stage B (targeted): 18-26 calls
-  - Stage C (safety + robustness): 8-14 calls
-- JSON schema for persisted results.
-- Simulation + acceptance tests for convergence and robustness constraints.
+  - critical traits: `T4,T5,T8,T9,T10`
+- Two-regime operation (`core`, `safety`) and JSON schema output.
 
-## Quickstart
+## Profile Studio (FastAPI + React)
+
+Profile Studio provides:
+
+- Profile run creation with live event stream (`SSE`) telemetry.
+- Profile history explorer with detailed trait/risk views.
+- Ingestion center with watched-folder sync and manual file import.
+- Query Lab with same-model A/B intervention (`profile off` vs `profile on`).
+
+### Backend API
+
+Code: `src/profile_studio_api`
+
+Run locally:
 
 ```bash
-python3 -m unittest discover -s tests -v
+pip install -e ".[studio]"
+uvicorn profile_studio_api.main:app --reload
 ```
 
-Run a hypothetical profile (simulated, no API calls):
+Default API URL: `http://localhost:8000`
+
+### Frontend UX
+
+Code: `web/`
+
+Run locally:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Default UI URL: `http://localhost:5173`
+
+## Data directories
+
+Created automatically by backend startup:
+
+- `data/profile_store.sqlite`: SQLite index/history store.
+- `data/profiles/*.json`: canonical profile artifacts.
+- `data/ingestion/`: watched ingestion folder.
+- `data/quarantine/`: invalid ingestion payload copies.
+
+## API surface
+
+- `POST /api/runs`
+- `GET /api/runs/{run_id}`
+- `GET /api/runs/{run_id}/events`
+- `GET /api/profiles`
+- `GET /api/profiles/{profile_id}`
+- `POST /api/profiles/import`
+- `POST /api/ingestion/scan`
+- `GET /api/ingestion/status`
+- `POST /api/query-lab/ab`
+- `POST /api/query-lab/apply`
+- `GET /api/meta/models`
+
+## Provider setup (real model calls)
+
+Install optional provider dependencies:
+
+```bash
+pip install -e ".[openai]"
+pip install -e ".[anthropic]"
+# or both + studio
+pip install -e ".[all]"
+```
+
+Set API keys:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+## Quick checks
+
+Run tests:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+Run simulated profile example:
 
 ```bash
 PYTHONPATH=src python3 examples/hypothetical_run.py
 ```
 
-## API setup (Anthropic & OpenAI)
+## Documentation map
 
-Install with optional provider support:
-
-```bash
-# Anthropic only
-pip install -e ".[anthropic]"
-
-# OpenAI only
-pip install -e ".[openai]"
-
-# Both
-pip install -e ".[all]"
-```
-
-Set your API key via environment variable:
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-```
-
-Run a real profile:
-
-```bash
-# Anthropic Claude
-python3 examples/run_anthropic.py
-
-# OpenAI
-python3 examples/run_openai.py
-```
-
-## Package layout
-
-- `src/adaptive_profiler/config.py`: run defaults and constraints
-- `src/adaptive_profiler/engine.py`: adaptive loop + stopping rules
-- `src/adaptive_profiler/item_bank.py`: conceptual bank + 25 concrete examples
-- `src/adaptive_profiler/mirt.py`: posterior updates and information estimates
-- `src/adaptive_profiler/selector.py`: adaptive item selection strategy
-- `src/adaptive_profiler/scoring.py`: automated scoring heads
-- `src/adaptive_profiler/diagnostics.py`: benchmark-overfit and robustness diagnostics
-- `src/adaptive_profiler/simulate.py`: panel simulation helpers
-- `schemas/profile_run.schema.json`: storage contract for results
+- `docs/convergence_first_budget_update.md`
+- `docs/profile_studio_overview.md`
+- `docs/profile_interpretation_guide.md`
+- `docs/query_lab_ab_guide.md`
+- `docs/use_cases_routing_and_alignment.md`
+- `docs/operations_ingestion_and_history.md`
+- `docs/examples_end_to_end_workflows.md`
